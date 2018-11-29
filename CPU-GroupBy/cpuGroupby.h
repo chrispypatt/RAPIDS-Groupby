@@ -18,31 +18,55 @@ using namespace std;
 
 class cpuGroupby {
 public:
+    // Custom Structures
+    enum reductionType {rmin, rmax};    //To Do: use this and add other types
+    
     //Variables
-    //To Do: update with dynamic key/value columns
-    int key_columns[SIZE];
+    int num_ops;        //unused at the moment - use to create array of "reductionType"
+    int* output_keys;
+    int* output_values;
+    reductionType* ops;
+    
+    // ARBITRARY VERSION
+    int* key_columns;
+    int* value_columns;
     int num_key_columns;
+    int num_value_columns;
     int num_key_rows;
-    int value_columns[SIZE];
-    int num_value_rows;
-    int num_ops;
-    int* output_keys;           //Assynubg obe value for now
-    int* output_values;         //Assuming one value for now
+    int num_value_rows;     //always the same as above...
     
     // Aaron's custom data types
     int numGroups;
+    int* tempCol;   //Used for temporary storage of groupPtrs
+    int* groupPtr;  //array of indicies of start of each group
     
     //Functions
     void fillRand();
     void sort();
     void groupby();
     void getNumGroups();
-    void rMax();
+    void doReductionOps();
+    void rMax(int valIdx);
     
     void printData();
     void printResults();
     void allocResultArray();
     void freeResults();
+    
+    // ARBITRARY FUNCTIONS
+    void allocKeys();
+    void allocValues();
+    void printDataX();
+    void fillRandX();
+    bool nextKeyBigger(int cRow);
+    void swapAtRow(int cRow);
+    void getGroupPtr();
+    void writeOutputKeys();
+    
+    //Constructor / destructor functions
+    cpuGroupby();
+    ~cpuGroupby();
+    
 };
 
 //To Do:

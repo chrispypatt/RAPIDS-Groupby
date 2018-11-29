@@ -19,7 +19,7 @@ int main(int argc, const char * argv[]) {
     
     cpuGroupby slowGroupby;
     slowGroupby.groupby();
-    slowGroupby.printResults();
+    //slowGroupby.printResults();
     
     return 0;
 }
