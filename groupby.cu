@@ -4,6 +4,33 @@
 #include <thrust/device_vector.h>
 enum reduction_op { max, min, sum, count, mean };
 
+// original code can be seen at https://stackoverflow.com/questions/28607171/sort-2d-array-in-cuda-with-thrust
+// modified for column major
+template <typename T>
+struct my_sort_functor
+{
+    int num_columns;
+    T* key_data[]; // 2D Array
+    //T* key_data; // 1D Array
+    my_sort_functor(int __num_columns, T* __key_data[]): num_columns(__num_columns), key_data(__key_data) {};
+    
+    __host__ __device__
+    bool operator()(const int idx1, const int idx2) const
+    {
+        bool flip = false;
+        for (auto i = 0; i < num_columns; ++i) {
+            T data1 = key_data[i][idx1];
+            T data2 = key_data[i][idx2];
+            if (data1 > data2) break;
+            else if (data1 < data2) {
+                flip = true;
+                break;
+            }
+        }
+        return flip;
+    }
+}
+
 //Launch reduction kernels for each column based on their specified operation
 template <typename T>
 void perform_operators(T* key_columns[], int num_key_columns, int num_key_rows,
