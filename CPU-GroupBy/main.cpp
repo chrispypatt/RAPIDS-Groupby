@@ -19,6 +19,14 @@ int main(int argc, const char * argv[]) {
     
     cpuGroupby slowGroupby;
     slowGroupby.groupby();
+
+    T *output_keys, *output_values;
+
+    groupby_GPU(slowGroupby.key_columns, slowGroupby.num_key_columns, 
+                slowGroupby.num_key_rows, slowGroupby.value_columns, 
+                slowGroupby.num_value_columns, slowGroupby.num_value_rows, 
+                slowGroupby.ops, slowGroupby.num_ops,
+                output_keys, output_values); 
     //slowGroupby.printResults();
     
     return 0;

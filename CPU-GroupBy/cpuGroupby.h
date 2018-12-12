@@ -16,6 +16,8 @@
 
 using namespace std;
 
+enum reductionType { max, min, sum, count, mean };
+
 class cpuGroupby {
 public:
     // Custom Structures
