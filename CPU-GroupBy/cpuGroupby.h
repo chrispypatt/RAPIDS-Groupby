@@ -13,7 +13,7 @@
 
 using namespace std;
 
-enum reductionType {rmin, rmax, rsum, rcount, rmean };    //To Do: use this and add other types
+    enum reductionType {rmin, rmax, rmean, rcount, rsum};
 
 class cpuGroupby {
 public:
@@ -51,6 +51,7 @@ public:
     void rMean(int valIdx);
     void rCount(int valIdx);
     void rMin(int valIdx);
+    void rSum(int valIdx);
     
     void printResults();
     void allocResultArray();
@@ -71,17 +72,11 @@ public:
     bool validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows);
 };
 
-//To Do:
-// class destructor/contructors
-// functionality of accepting pointer to data
-
 // Model after this:
 /*
  groupby( T* key_columns[], int num_key_columns, int num_key_rows,
  T* value_columns[], int num_value_columns, int num_value_rows,
  reduction_op ops[], int num_ops, T* output_keys[], T* output_values[]) {
- 
- 
  }
  */
 
