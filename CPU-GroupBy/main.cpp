@@ -14,20 +14,27 @@
 
 using namespace std;
 int main(int argc, const char * argv[]) {
-    // insert code here...
-    cout << "Hello, World!\n";
-    
-    cpuGroupby slowGroupby;
+    // Setting up the CPU groupby
+    // 2 Key cols, 3 value cols, 100 rows
+    cpuGroupby slowGroupby(2, 3, 100);
+    // Filling arrays with 3 distinct keys, 100 distinct values
+    slowGroupby.fillRand(3, 100);
     slowGroupby.groupby();
-
+    
+    // Insert GPU function calls here...
+    /*
     T *output_keys, *output_values;
-
-    groupby_GPU(slowGroupby.key_columns, slowGroupby.num_key_columns, 
+    groupby_GPU(slowGroupby.key_columns, slowGroupby.num_key_columns,
                 slowGroupby.num_key_rows, slowGroupby.value_columns, 
                 slowGroupby.num_value_columns, slowGroupby.num_value_rows, 
                 slowGroupby.ops, slowGroupby.num_ops,
                 output_keys, output_values); 
+    */
     //slowGroupby.printResults();
+    
+    // Validating the GPU Result
+    // To - do
+    //slowGroupby.validGPUResult(output_keys, output_values, output_rows);
     
     return 0;
 }

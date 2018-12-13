@@ -10,26 +10,16 @@
 #include "cpuGroupby.h"
 #include <time.h>
 
-// Memory Allocation (put all in one function)
-void cpuGroupby::allocKeys() {
-    key_columns = (int *)malloc(sizeof(int)*num_key_columns*num_key_rows);
-}
-
-void cpuGroupby::allocValues() {
-    value_columns = (int *)malloc(sizeof(int)*num_value_columns*num_value_rows);
-    tempCol = (int *)malloc(sizeof(int)*num_value_rows);
-}
-
-void cpuGroupby::fillRandX() {
+void cpuGroupby::fillRand(int distinctKeys, int distinctVals) {
     srand((unsigned int)time(NULL));
     for (int cRow=0; cRow<num_key_rows; cRow++) {
         //Fill the key columns in a row
         for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
-            key_columns[keyIdx*num_key_rows + cRow] = rand() % (3+1);
+            key_columns[keyIdx*num_key_rows + cRow] = rand() % (distinctKeys+1);
         }
         //Fill the value columns in a row
         for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
-            value_columns[valIdx*num_value_rows + cRow] = rand() % (100+1);
+            value_columns[valIdx*num_value_rows + cRow] = rand() % (distinctVals+1);
         }
     }
 }
@@ -119,26 +109,14 @@ void cpuGroupby::getGroupPtr() {
 // Groupby functions
 void cpuGroupby::groupby() {
     //max, min, sum, count, and arithmetic mean
-    // Just do the max for testing now.
-    // Setup / test parameters
-    num_key_rows = 100;     // These are always equal
-    num_value_rows = 100;
-    num_key_columns = 3;
-    num_value_columns = 3;
-    
-    //Init the list of reduction operations
-    num_ops = 3;    //This is always the same as num_value_columns
-    ops = (reductionType*)malloc(sizeof(reductionType)*num_ops);
-    ops[0] = rmax;
-    ops[1] = rmax;
-    ops[2] = rmax;
-    
-    allocKeys();
-    allocValues();
-    fillRandX();
+    //Init reduction operation list (rmax for testing)
+    for (int i=0; i<num_value_columns; i++) {
+        ops[i] = rmax;
+    }
+
     sort();
     getNumGroups();
-    printDataX();
+    printData();
     
     allocResultArray();
     getGroupPtr();
@@ -189,6 +167,53 @@ void cpuGroupby::rMax(int valIdx) {
     output_values[valIdx*numGroups + numGroups-1] = maximum;
 }
 
+// To do - test rMin
+void cpuGroupby::rMin(int valIdx) {
+    int minimum = 999999999;
+    int tempVal;
+    
+    for (int groupIdx=1; groupIdx<numGroups; groupIdx++) {
+        minimum = 999999999;
+        for (int subIdx=0; subIdx<groupPtr[groupIdx]-groupPtr[groupIdx-1]; subIdx++) {
+            tempVal = value_columns[ valIdx*num_value_rows + groupPtr[groupIdx-1]+subIdx ];
+            if (tempVal<minimum) {
+                minimum = tempVal;
+            }
+        }
+        // Copy values to the output array
+        output_values[valIdx*numGroups + groupIdx-1] = minimum;
+    }
+}
+
+// To do - test rMean
+void cpuGroupby::rMean(int valIdx) {
+    float sum=0;
+    float mean=0;
+    for (int groupIdx=1; groupIdx<numGroups; groupIdx++) {
+        sum = 0;
+        for (int subIdx=0; subIdx<groupPtr[groupIdx]-groupPtr[groupIdx-1]; subIdx++) {
+            sum = 0;
+            sum += value_columns[valIdx*num_value_rows + groupPtr[groupIdx-1]+subIdx ];
+            mean=sum/groupPtr[groupIdx]-groupPtr[groupIdx-1];
+        }
+        // Copy values to the output array
+        output_values[valIdx*numGroups + groupIdx-1] = mean;
+    }
+}
+
+// To do - test rCount
+void cpuGroupby::rCount(int valIdx) {
+    int count = 0;
+    for (int groupIdx=1; groupIdx<numGroups; groupIdx++) {
+        count = 0;
+        for (int subIdx=0; subIdx<groupPtr[groupIdx]-groupPtr[groupIdx-1]; subIdx++) {
+            count =groupPtr[groupIdx]-groupPtr[groupIdx-1];
+        }
+        // Copy values to the output array
+        output_values[valIdx*numGroups + groupIdx-1] = count;
+    }
+}
+
 void cpuGroupby::writeOutputKeys() {
     // Copy each unique key to the output.
     int rowIdx;
@@ -202,19 +227,9 @@ void cpuGroupby::writeOutputKeys() {
 
 
 // Debug / Printing Functions
-
 void cpuGroupby::printData() {
     cout << "Printing Data..." << endl;
-    for (int i=0; i<SIZE; i++) {
-        cout << key_columns[i] << ":" << value_columns[i] << endl;
-    }
-    cout << "End Printing Data" << endl;
-}
-
-void cpuGroupby::printDataX() {
-    cout << "Printing Data..." << endl;
     
-    //To Do: is num_key_rows always the same as num_value_rows?
     for (int cRow=0; cRow<num_key_rows; cRow++) {
         //print keys for a row
         for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
@@ -278,28 +293,47 @@ void cpuGroupby::printResults() {
         cout << endl;
     }
     
-    cout << "End Printing Data" << endl;
+    cout << "End Printing Results" << endl;
 }
 
+// To do: is the GPU result sorted?
+bool cpuGroupby::validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows) {
+    //ASSUMING THE GPU RESULT IS SORTED
+    if (GPUOutputRows != numGroups) {
+        cout << "FAILED - CPU Rows: " << numGroups << " GPU Rows: " << GPUOutputRows << endl;
+        return false;
+    }
+    for (int i=0; i<num_value_columns*numGroups; i++) {
+        if (GPUValues[i] != value_columns[i]) {
+            return false;
+        }
+    }
+    return true;
+}
 
 // Contructor & Destructor Funcitons
 cpuGroupby::~cpuGroupby() {
-    /*
     //Free the allocated memory
-    for (int i=0; i<num_key_columns; i++) {
-        free( *(key_columns + i) );
-    }
-    for (int i=0; i<num_value_columns; i++) {
-        //To Do - fix this bug
-        //free( *(value_columns + i) );
-    }
-    */
     free(key_columns);
     free(value_columns);
-    
+    free(tempCol);
+    free(ops);
 }
 
-cpuGroupby::cpuGroupby() {
-    //not sure what to put in here...
+cpuGroupby::cpuGroupby(int numKeys, int numValues, int numRows) {
+    // Save the arguments
+    num_key_columns = numKeys;
+    num_key_rows = numRows;
+    num_value_columns = numValues;
+    num_value_rows = numRows;
+    num_ops = numValues;
+    
+    // Allocate key & value arrays
+    key_columns = (int *)malloc(sizeof(int)*num_key_columns*num_key_rows);
+    value_columns = (int *)malloc(sizeof(int)*num_value_columns*num_value_rows);
+    tempCol = (int *)malloc(sizeof(int)*num_value_rows);
+    ops = (reductionType*)malloc(sizeof(reductionType)*num_ops);
 }
+
+
 

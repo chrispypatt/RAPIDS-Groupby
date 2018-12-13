@@ -10,9 +10,6 @@
 #define cpuGroupby_h
 
 #include <iostream>
-#include <stdio.h>
-
-#define SIZE 1000   //To Do: make size dynamic
 
 using namespace std;
 
@@ -24,7 +21,7 @@ public:
     enum reductionType {rmin, rmax};    //To Do: use this and add other types
     
     //Variables
-    int num_ops;        //unused at the moment - use to create array of "reductionType"
+    int num_ops;
     int* output_keys;
     int* output_values;
     reductionType* ops;
@@ -42,33 +39,37 @@ public:
     int* tempCol;   //Used for temporary storage of groupPtrs
     int* groupPtr;  //array of indicies of start of each group
     
-    //Functions
-    void fillRand();
+    // Functions
+    void fillRand(int distinctKeys, int distinctVals);
     void sort();
     void groupby();
     void getNumGroups();
     void doReductionOps();
-    void rMax(int valIdx);
     
-    void printData();
+    // Reduction Functions
+    // To do: add sum function
+    void rMax(int valIdx);
+    void rMean(int valIdx);
+    void rCount(int valIdx);
+    void rMin(int valIdx);
+    
     void printResults();
     void allocResultArray();
     void freeResults();
     
     // ARBITRARY FUNCTIONS
-    void allocKeys();
-    void allocValues();
-    void printDataX();
-    void fillRandX();
+    void printData();
     bool nextKeyBigger(int cRow);
     void swapAtRow(int cRow);
     void getGroupPtr();
     void writeOutputKeys();
     
     //Constructor / destructor functions
-    cpuGroupby();
-    ~cpuGroupby();
+    cpuGroupby(int numKeys, int numValues, int numRows);
+    ~cpuGroupby();  // To do - make sure arrays are freed
     
+    // GPU Validation
+    bool validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows);
 };
 
 //To Do:
