@@ -18,7 +18,7 @@
 template <typename T>
 void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	T* value_columns, int num_value_columns, int num_value_rows,
-	reductionType ops, int num_ops, T* output_keys, T* output_values)
+	reductionType* ops, int num_ops, T* output_keys, T* output_values)
 {
 	//Perform hashing
 	dim3 dimGrid(ceil((float)num_key_columns/(float)BLOCK_SIZE),1,1);
