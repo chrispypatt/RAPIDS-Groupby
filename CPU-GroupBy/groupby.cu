@@ -14,31 +14,11 @@
 
 #define BLOCK_SIZE 2048
 
-template <typename T>
-__global__ void MurmurHash3_x64_128_hash(const T* key_columns[],
-                           const int num_key_columns,
-                           const int num_key_rows,
-                           const uint32_t MurmurHash3_x64_128_tab[],
-    					   uint32_t MurmurHash3_x64_128_result[], uint32_t seed)
-{
-    uint32_t hash = seed;
-    // num of bytes in the message
-	size_t Message_size = sizeof(T) * num_key_columns;
-    size_t idx = threadIdx.x + blockDim.x * blockIdx.x;
-    if (idx < num_key_rows) {
-        // uint32_t hash *= 0xc2b2ae35;
-        for (size_t i = 0; i < Message_size; ++i) {
-            hash = MurmurHash3_x64_128_tab[(hash ^ message)] ^ (hash >> 16);
-        }
-        MurmurHash3_x64_128_result[idx] ^= hash;
-    }
-}
-
 //Launch reduction kernels for each column based on their specified operation
 template <typename T>
-void groupby_GPU(T* key_columns[], int num_key_columns, int num_key_rows,
-	T* value_columns[], int num_value_columns, int num_value_rows,
-	reductionType ops[], int num_ops, T* output_keys[], T* output_values[])
+void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
+	T* value_columns, int num_value_columns, int num_value_rows,
+	reductionType ops, int num_ops, T* output_keys, T* output_values)
 {
 	//Perform hashing
 	dim3 dimGrid(ceil((float)num_key_columns/(float)BLOCK_SIZE),1,1);
@@ -46,14 +26,12 @@ void groupby_GPU(T* key_columns[], int num_key_columns, int num_key_rows,
 
 	uint32_t* hash_keys;
 	cudaMalloc((void **) &hash_keys, num_key_rows * sizeof(uint32_t));
+
+	//TODO: ADD hashing here. 
+
 	thrust::device_ptr<uint32_t> d_hash_keys(hash_keys);
 	thrust::fill(d_hash_keys, d_hash_keys + num_key_rows, (int) 0);
 
-	MurmurHash3_x64_128_hash<<<dimGrid,dimBlock>>>(key_columns,
-		num_key_columns,
-		num_key_rows,
-		MurmurHash3_x64_128_tab,
-		d_hash_keys, 0);
 
 	//create index array for sorting. 
 	thrust::device_vector<int> d_i(num_key_rows), key_locations(num_value_rows);
