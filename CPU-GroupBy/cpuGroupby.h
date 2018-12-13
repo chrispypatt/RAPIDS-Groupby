@@ -13,12 +13,11 @@
 
 using namespace std;
 
-enum reductionType { max, min, sum, count, mean };
+enum reductionType {rmin, rmax, rsum, rcount, rmean };    //To Do: use this and add other types
 
 class cpuGroupby {
 public:
     // Custom Structures
-    enum reductionType {rmin, rmax};    //To Do: use this and add other types
     
     //Variables
     int num_ops;
