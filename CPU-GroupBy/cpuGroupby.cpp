@@ -9,6 +9,7 @@
 #include <iostream>
 #include "cpuGroupby.h"
 #include <time.h>
+#include <cstdlib>
 
 void cpuGroupby::fillRand(int distinctKeys, int distinctVals) {
     srand((unsigned int)time(NULL));

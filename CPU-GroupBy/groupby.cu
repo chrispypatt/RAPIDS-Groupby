@@ -17,7 +17,10 @@ void groupby_GPU(T* key_columns[], int num_key_columns, int num_key_rows,
 	T* value_columns[], int num_value_columns, int num_value_rows,
 	reductionType ops[], int num_ops, T* output_keys[], T* output_values[])
 {
-	//Perform hashing
+	//TODO: hashing here
+
+	// thrust::device_vector<T> d_hash_keys(num_key_rows), d_unique_keys(num_key_rows);
+
 	dim3 dimGrid(ceil((float)num_key_columns/(float)BLOCK_SIZE),1,1);
 	dim3 dimBlock(BLOCK_SIZE,1,1);
 
@@ -32,26 +35,23 @@ void groupby_GPU(T* key_columns[], int num_key_columns, int num_key_rows,
 		d_hash_keys, 0);
 
 	//create index array for sorting. 
-	thrust::device_vector<int> d_i(num_key_rows), key_locations(num_value_rows);
+	thrust::device_vector<int> d_i(num_key_rows);
 	thrust::sequence(thrust::host, d_i.begin(), d_i.end()); 
 
-	//sort by key, also sort value indices. The result can be used to sort the actual data arrays later
+	//sort by key, also sort values. The result can be used to sort the actual data arrays later
 	thrust::sort_by_key(d_hash_keys, d_hash_keys + num_key_columns, d_i);
-
-	//Find count of unqiue keys - save location of where to find each key
-	thrust::copy(d_hash_keys, d_hash_keys + num_key_columns,d_unique_keys.begin());
-	thrust::copy(d_i.begin(), d_i.end(), key_locations.begin()); 
-	int num_output_rows = thrust::unique_by_key(d_unique_keys.begin(), d_unique_keys.end(), key_locations.begin()).first - d_hash_keys.begin();
+	//Find count of unqiue keys
+	thrust::copy(d_hash_keys, d_hash_keys + num_key_columns,,d_unique_keys.begin());
+	int num_output_rows = thrust::unique_by_key(d_unique_keys.begin(), d_unique_keys.end()).first - d_hash_keys.begin();
 
 
 	//setup output arrays
-	output_keys = new T[num_output_rows*num_key_columns];
+	output_keys = new T[num_output_rows];
 	output_values = new T[num_output_rows*num_value_columns];
 
 	//copy back unique keys
-	for (int i = 0; i<num_key_columns, i++){//i represents column of key output
-		thrust::copy_n(thrust::make_permutation_iterator(key_columns + (i*num_output_rows), key_locations.begin()), num_output_rows, sorted_col.begin());
-	}
+	// thrust::copy(d_hash_keys.begin(), d_hash_keys.begin() + new_end, output_keys);
+
 
 	//iterate though all columns of the matrix. Perfrom the operation corresponding to that column
 	for (int i = 0; i<num_ops, i++){//i represents column of output
@@ -62,7 +62,12 @@ void groupby_GPU(T* key_columns[], int num_key_columns, int num_key_rows,
 		thrust::device_vector<T> sorted_col(num_value_rows);
 		thrust::copy_n(thrust::make_permutation_iterator(value_columns + start, d_i.begin()), num_value_rows, sorted_col.begin());
 
-		thrust::copy(value_columns + start, value_columns + end,col.begin());
+		// thrust::device_vector<T> col(num_value_rows), sorted_col(num_value_rows);
+		// thrust::device_vector<T> output_keys(num_output_rows), output_vector(num_output_rows);
+		// thrust::copy(value_columns + start, value_columns + end,col.begin());
+
+		//the column is not sorted yet so use d_i to sort!
+		// thrust::copy_n(thrust::make_permutation_iterator(col.begin(), d_i.begin()), num_value_rows, sorted_col.begin());
 
 		switch(input.ops[i]){
 			case max:
