@@ -102,9 +102,6 @@ void cpuGroupby::getGroupPtr() {
     for (int i=0; i<numGroups; i++) {
         groupPtr[i] = tempCol[i];
     }
-    
-    // To Do: Get rid of the tempCol Array?
-    //free(tempCol);
 }
 
 // Groupby functions
@@ -112,7 +109,7 @@ void cpuGroupby::groupby() {
     //max, min, sum, count, and arithmetic mean
     //Init reduction operation list (rmax for testing)
     for (int i=0; i<num_value_columns; i++) {
-        ops[i] = rmax;
+        ops[i] = rsum;
     }
 
     sort();
@@ -132,7 +129,18 @@ void cpuGroupby::doReductionOps() {
             case rmax:
                 rMax(valIdx);
                 break;
-                
+            case rmin:
+                rMin(valIdx);
+                break;
+            case rmean:
+                rMean(valIdx);
+                break;
+            case rcount:
+                rCount(valIdx);
+                break;
+            case rsum:
+                rSum(valIdx);
+                break;
             default:
                 rMax(valIdx);
                 break;
@@ -168,7 +176,6 @@ void cpuGroupby::rMax(int valIdx) {
     output_values[valIdx*numGroups + numGroups-1] = maximum;
 }
 
-// To do - test rMin
 void cpuGroupby::rMin(int valIdx) {
     int minimum = 999999999;
     int tempVal;
@@ -184,35 +191,74 @@ void cpuGroupby::rMin(int valIdx) {
         // Copy values to the output array
         output_values[valIdx*numGroups + groupIdx-1] = minimum;
     }
+    
+    //Handeling the final group
+    minimum = 999999999;
+    for (int subIdx=groupPtr[numGroups-1]; subIdx<num_value_rows; subIdx++) {
+        tempVal = value_columns[ valIdx*num_value_rows + subIdx ];
+        if (tempVal<minimum) {
+            minimum = tempVal;
+        }
+    }
+    // Copy values to the output array
+    output_values[valIdx*numGroups + numGroups-1] = minimum;
 }
 
-// To do - test rMean
 void cpuGroupby::rMean(int valIdx) {
     float sum=0;
     float mean=0;
     for (int groupIdx=1; groupIdx<numGroups; groupIdx++) {
         sum = 0;
         for (int subIdx=0; subIdx<groupPtr[groupIdx]-groupPtr[groupIdx-1]; subIdx++) {
-            sum = 0;
             sum += value_columns[valIdx*num_value_rows + groupPtr[groupIdx-1]+subIdx ];
-            mean=sum/groupPtr[groupIdx]-groupPtr[groupIdx-1];
         }
         // Copy values to the output array
+        mean = sum / (groupPtr[groupIdx]-groupPtr[groupIdx-1]);
         output_values[valIdx*numGroups + groupIdx-1] = mean;
     }
+    
+    //Handeling the final group
+    sum = 0;
+    for (int subIdx=groupPtr[numGroups-1]; subIdx<num_value_rows; subIdx++) {
+        sum += value_columns[ valIdx*num_value_rows + subIdx ];
+    }
+    // Copy values to the output array
+    mean = sum / (num_value_rows-groupPtr[numGroups-1]);
+    output_values[valIdx*numGroups + numGroups-1] = mean;
 }
 
-// To do - test rCount
+void cpuGroupby::rSum(int valIdx) {
+    float sum=0;
+    for (int groupIdx=1; groupIdx<numGroups; groupIdx++) {
+        sum = 0;
+        for (int subIdx=0; subIdx<groupPtr[groupIdx]-groupPtr[groupIdx-1]; subIdx++) {
+            sum += value_columns[valIdx*num_value_rows + groupPtr[groupIdx-1]+subIdx ];
+        }
+        // Copy values to the output array
+        output_values[valIdx*numGroups + groupIdx-1] = sum;
+    }
+    
+    //Handeling the final group
+    sum = 0;
+    for (int subIdx=groupPtr[numGroups-1]; subIdx<num_value_rows; subIdx++) {
+        sum += value_columns[ valIdx*num_value_rows + subIdx ];
+    }
+    // Copy values to the output array
+    output_values[valIdx*numGroups + numGroups-1] = sum;
+}
+
 void cpuGroupby::rCount(int valIdx) {
     int count = 0;
     for (int groupIdx=1; groupIdx<numGroups; groupIdx++) {
-        count = 0;
-        for (int subIdx=0; subIdx<groupPtr[groupIdx]-groupPtr[groupIdx-1]; subIdx++) {
-            count =groupPtr[groupIdx]-groupPtr[groupIdx-1];
-        }
+        count = groupPtr[groupIdx]-groupPtr[groupIdx-1];
+        
         // Copy values to the output array
         output_values[valIdx*numGroups + groupIdx-1] = count;
     }
+    
+    // Handling the final group
+    count = num_value_rows-groupPtr[numGroups-1];
+    output_values[valIdx*numGroups + numGroups-1] = count;
 }
 
 void cpuGroupby::writeOutputKeys() {
@@ -244,7 +290,7 @@ void cpuGroupby::printData() {
                 cout << "}:";
             }
         }
-        //To Do: print values for a row
+        // Print values for a row
         for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
             if (valIdx == 0) {
                 cout << "{";
@@ -259,13 +305,12 @@ void cpuGroupby::printData() {
         cout << endl;
     }
     
-    cout << "End Printing Data" << endl;
+    cout << "End Printing Data" << endl << endl;
 }
 
 void cpuGroupby::printResults() {
     cout << "Printing Results..." << endl;
     
-    //To Do: is num_key_rows always the same as num_value_rows?
     for (int cRow=0; cRow<numGroups; cRow++) {
         //print keys for a row
         for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
@@ -279,7 +324,7 @@ void cpuGroupby::printResults() {
                 cout << "}:";
             }
         }
-        //To Do: print values for a row
+        // Print values for a row
         for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
             if (valIdx == 0) {
                 cout << "{";
@@ -297,7 +342,7 @@ void cpuGroupby::printResults() {
     cout << "End Printing Results" << endl;
 }
 
-// To do: is the GPU result sorted?
+// To do: Verify function w GPU code
 bool cpuGroupby::validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows) {
     //ASSUMING THE GPU RESULT IS SORTED
     if (GPUOutputRows != numGroups) {
@@ -319,6 +364,8 @@ cpuGroupby::~cpuGroupby() {
     free(value_columns);
     free(tempCol);
     free(ops);
+    free(output_keys);
+    free(output_values);
 }
 
 cpuGroupby::cpuGroupby(int numKeys, int numValues, int numRows) {
