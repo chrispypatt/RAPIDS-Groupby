@@ -12,7 +12,54 @@
 #include "HashFunc.h"
 #include <thrust/iterator/permutation_iterator.h>
 
-#define BLOCK_SIZE 2048
+#define BLOCK_SIZE 1024 // GTX 1080 only support 1024 thread per block
+
+// original code can be seen at https://stackoverflow.com/questions/28607171/sort-2d-array-in-cuda-with-thrust
+// modified for column major
+template <typename T>
+struct my_sort_functor
+{
+    int num_columns, num_rows;
+    T* key_data; // 1D Array
+    my_sort_functor(int __num_columns, int __num_rows, T* __key_data): num_columns(__num_columns), num_rows(__num_rows), key_data(__key_data) {};
+    
+    __host__ __device__
+    bool operator()(const int idx1, const int idx2) const
+    {
+        bool flip = false;
+        for (auto i = 0; i < num_columns; ++i) {
+            T data1 = key_data[i * num_rows + idx1];
+            T data2 = key_data[i * num_rows + idx2];
+            if (data1 > data2) break;
+            else if (data1 < data2) {
+                flip = true;
+                break;
+            }
+        }
+        return flip;
+    }
+}
+
+// check current element and previous element, if not same set 1
+template<typename T>
+__global__ identify_bound(T* key_columns, int num_key_rows, int num_key_columns,
+	uint32_t* result_array)
+{
+	int tidx = threadIdx.x + blockDim.x * blockIdx.x;
+	int prev_idx = (tidx == 0) ? 0 : (tidx - 1);
+	int result = 0;
+
+	if (tidx < num_key_rows) {
+		for (int i = 0; i < num_key_columns; ++i) {
+			if (key_columns[i][prev_idx] != key_columns[i][tidx]) {
+				result = 1;
+				break;
+			}
+		}
+		result_array[tidx] = result;
+	}
+}
+
 
 //Launch reduction kernels for each column based on their specified operation
 template <typename T>
@@ -21,33 +68,50 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	reductionType* ops, int num_ops, T* output_keys, T* output_values)
 {
 	//Perform hashing
-	dim3 dimGrid(ceil((float)num_key_columns/(float)BLOCK_SIZE),1,1);
-	dim3 dimBlock(BLOCK_SIZE,1,1);
-
+	uint32_t dimBlock = BLOCK_SIZE;
+	uint32_t dimGrid = (num_key_rows + BLOCK_SIZE - 1) / BLOCK_SIZE;
 	uint32_t* hash_keys;
 	cudaMalloc((void **) &hash_keys, num_key_rows * sizeof(uint32_t));
 
-	uint32_t* d_keys;
-	cudaMalloc((void **) &d_keys, num_key_rows*num_key_columns*sizeof(uint32_t));
+	// use device vector 
+	thrust::device_vector<T> d_keys(key_columns, key_columns + num_key_rows);
+	T* d_keys_raw = thrust::raw_pointer_cast(d_keys.data());
 
-	//TODO: ADD hashing here. 
+	thrust::device_vector<T> d_sorted_keys = d_keys;
+	T* d_sorted_keys_raw = thrust::raw_pointer_cast(d_sorted_keys.data());
 
-	MurmurHash3_x64_128_hash<<<dimGrid,dimBlock>>>(key_columns,
-		num_key_columns,
-		num_key_rows,
-		MurmurHash3_x64_128_tab,
-		hash_keys, 0);
+	// create original index
 
+	thrust::device_vector<int> d_i(num_key_rows);
+	thrust::sequence(thrust::host, d_i.begin(), d_i.end()); 
+	int * d_i_raw = thrust::raw_pointer_cast(d_i.data());
+
+	// sort the index according to values in d_keys and distributed values to d_sorted_keys
+
+	thrust::sort(d_i.begin(), d_i.end(), my_sort_functor(num_key_columns, num_key_rows, d_keys_raw));
+
+	for (int i = 0; i<num_key_columns; i++){//i represents column of key output
+		thrust::copy_n(thrust::make_permutation_iterator(key_columns + (i*num_output_rows), key_locations.begin()), num_key_rows, d_sorted_keys);
+	}
+	
 	thrust::device_ptr<uint32_t> d_hash_keys(hash_keys);
 	thrust::fill(d_hash_keys, d_hash_keys + num_key_rows, (int) 0);
 
-	//create index array for sorting. 
-	thrust::device_vector<int> d_i(num_key_rows), key_locations(num_value_rows);
-	thrust::device_vector<uint32_t> d_unique_keys(num_value_rows);
-	thrust::sequence(thrust::host, d_i.begin(), d_i.end()); 
+	// check the boundary then scan the boundary
 
-	//sort by key, also sort value indices. The result can be used to sort the actual data arrays later
-	thrust::sort_by_key(d_hash_keys, d_hash_keys + num_key_columns, d_i);
+	identify_bound<<<dimGrid, dimBlock>>>(d_sorted_keys_raw, num_key_rows, num_key_columns, hash_keys);
+	thrust::exclusive_scan(thrust::device, d_hash_keys, d_hash_keys + num_key_rows, d_hash_keys);
+
+	// Now the keys in d_sorted_keys should be sorted and d_hash_keys will have identical value for identical keys, note the value is already sorted
+	// so can run reduce_by_key directly on the sorted keys to get unique keys
+
+	//create index array for sorting. 
+	thrust::device_vector<int> key_locations(num_value_rows);
+	thrust::device_vector<uint32_t> d_unique_keys(num_value_rows);
+	
+
+	//old: sort by key, also sort value indices. The result can be used to sort the actual data arrays later
+	//thrust::sort_by_key(d_hash_keys, d_hash_keys + num_key_columns, d_i);
 
 	//Find count of unqiue keys - save location of where to find each key
 	thrust::copy(d_hash_keys, d_hash_keys + num_key_rows,d_unique_keys.begin());
@@ -70,7 +134,8 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 		//get this column of data. copy does [first, last) 
 		int start = i*num_value_rows;
 		// int end = (i+1)*num_value_rows;
-		//the column is not sorted yet so use d_i to sort!
+		//the column is not sorted yet so use d_i to sort! 
+		// note: is this vector initialized with di?
 		thrust::device_vector<T> sorted_col(num_value_rows);
 		uint32_t* output_ptr;
 		cudaMalloc((void **) &output_ptr, num_value_rows * sizeof(T));
