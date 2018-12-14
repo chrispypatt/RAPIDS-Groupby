@@ -82,6 +82,7 @@
 //    h ^= h >> 16;
 //    return h;
 //}
+__constant__ uint32_t MurmurHash3_x64_128_tab_c[256];
 
 const uint32_t MurmurHash3_x64_128_tab[] = {
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
@@ -129,7 +130,6 @@ const uint32_t MurmurHash3_x64_128_tab[] = {
     0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
 };
 
-__constant__ uint32_t MurmurHash3_x64_128_tab_c[256];
 
 template <typename T>
 __global__ void MurmurHash3_x64_128_hash(const T* key_columns[],
