@@ -27,11 +27,19 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	uint32_t* hash_keys;
 	cudaMalloc((void **) &hash_keys, num_key_rows * sizeof(uint32_t));
 
+	uint32_t* d_keys;
+	cudaMalloc((void **) &d_keys, num_key_rows*num_key_columns*sizeof(uint32_t));
+
 	//TODO: ADD hashing here. 
+
+	MurmurHash3_x64_128_hash<<<dimGrid,dimBlock>>>(key_columns,
+		num_key_columns,
+		num_key_rows,
+		MurmurHash3_x64_128_tab,
+		hash_keys, 0);
 
 	thrust::device_ptr<uint32_t> d_hash_keys(hash_keys);
 	thrust::fill(d_hash_keys, d_hash_keys + num_key_rows, (int) 0);
-
 
 	//create index array for sorting. 
 	thrust::device_vector<int> d_i(num_key_rows), key_locations(num_value_rows);

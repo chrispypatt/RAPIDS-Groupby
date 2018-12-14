@@ -10,7 +10,7 @@ endif
 
 LD_FLAGS    = -lcudart -L/usr/local/cuda/lib64
 EXE	        = groupby
-OBJ	        = main.o cpuGroupby.o groupby.o HashFunc.o
+OBJ	        = main.o cpuGroupby.o groupby.o HashFunc.o 
 
 default: $(EXE)
 

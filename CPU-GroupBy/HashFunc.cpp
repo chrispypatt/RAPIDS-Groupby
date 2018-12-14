@@ -11,7 +11,7 @@
 
 
 template <typename T>
-__global__ void MurmurHash3_x64_128_hash(const T* key_columns,
+__global__ void MurmurHash3_x64_32_hash(const T* key_columns,
                            const int num_key_columns,
                            const int num_key_rows,
                            const uint32_t MurmurHash3_x64_128_tab[],
