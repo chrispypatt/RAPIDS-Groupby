@@ -74,7 +74,7 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	cudaMalloc((void **) &hash_keys, num_key_rows * sizeof(uint32_t));
 
 	// use device vector 
-	thrust::device_vector<T> d_keys(key_columns, key_columns + num_key_rows);
+	thrust::device_vector<T> d_keys(key_columns, key_columns + num_key_rows * num_key_columns);
 	T* d_keys_raw = thrust::raw_pointer_cast(d_keys.data());
 
 	thrust::device_vector<T> d_sorted_keys = d_keys;
