@@ -12,9 +12,7 @@
 #include <time.h>
 #include "cpuGroupby.h"
 
-// Thrust Test
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
+#include "groupby.cu"
 
 using namespace std;
 int main(int argc, const char * argv[]) {
@@ -24,19 +22,16 @@ int main(int argc, const char * argv[]) {
     // Filling arrays with 3 distinct keys, 100 distinct values
     slowGroupby.fillRand(3, 100);
     slowGroupby.groupby();
-    
-    //Thrust test for makefile
-    thrust::device_vector<int> D;
+
     
     // Insert GPU function calls here...
-    /*
-    T *output_keys, *output_values;
+    int *output_keys, *output_values;
     groupby_GPU(slowGroupby.key_columns, slowGroupby.num_key_columns,
                 slowGroupby.num_key_rows, slowGroupby.value_columns, 
                 slowGroupby.num_value_columns, slowGroupby.num_value_rows, 
                 slowGroupby.ops, slowGroupby.num_ops,
                 output_keys, output_values); 
-    */
+    
     //slowGroupby.printResults();
     
     // Validating the GPU Result

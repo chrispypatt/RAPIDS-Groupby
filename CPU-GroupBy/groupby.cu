@@ -9,7 +9,7 @@
 #include <thrust/pair.h>
 #include <thrust/execution_policy.h>
 #include "cpuGroupby.h"
-#include "HashFunc.h"
+#include "HashFunc.cu"
 #include <thrust/iterator/permutation_iterator.h>
 
 #define BLOCK_SIZE 1024 // GTX 1080 only support 1024 thread per block
@@ -38,11 +38,11 @@ struct my_sort_functor
         }
         return flip;
     }
-}
+};
 
 // check current element and previous element, if not same set 1
 template<typename T>
-__global__ identify_bound(T* key_columns, int num_key_rows, int num_key_columns,
+__global__ void identify_bound(T* key_columns, int num_key_rows, int num_key_columns,
 	uint32_t* result_array)
 {
 	int tidx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -51,7 +51,7 @@ __global__ identify_bound(T* key_columns, int num_key_rows, int num_key_columns,
 
 	if (tidx < num_key_rows) {
 		for (int i = 0; i < num_key_columns; ++i) {
-			if (key_columns[i][prev_idx] != key_columns[i][tidx]) {
+			if (key_columns[i*num_key_rows+prev_idx] != key_columns[i*num_key_rows+tidx]) {
 				result = 1;
 				break;
 			}
@@ -70,8 +70,9 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	//Perform hashing
 	uint32_t dimBlock = BLOCK_SIZE;
 	uint32_t dimGrid = (num_key_rows + BLOCK_SIZE - 1) / BLOCK_SIZE;
-	uint32_t* hash_keys;
-	cudaMalloc((void **) &hash_keys, num_key_rows * sizeof(uint32_t));
+
+	typedef typename thrust::device_vector<T>::iterator ElementIterator;
+	typedef thrust::device_vector<int>::iterator IndexIterator;
 
 	// use device vector 
 	thrust::device_vector<T> d_keys(key_columns, key_columns + num_key_rows * num_key_columns);
@@ -90,10 +91,16 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 
 	thrust::sort(d_i.begin(), d_i.end(), my_sort_functor(num_key_columns, num_key_rows, d_keys_raw));
 
-	for (int i = 0; i<num_key_columns; i++){//i represents column of key output
-		thrust::copy_n(thrust::make_permutation_iterator(key_columns + (i*num_output_rows), key_locations.begin()), num_key_rows, d_sorted_keys);
+	for (int i = 0; i<num_key_columns; i++){//i represents column of key 
+
+		thrust::permutation_iterator<ElementIterator,IndexIterator> data(key_columns + (i*num_output_rows),key_locations.data());
+		thrust::copy_n(data, num_key_rows, d_sorted_keys.begin()+i*num_key_rows);
+
 	}
 	
+
+	uint32_t* hash_keys;
+	cudaMalloc((void **) &hash_keys, num_key_rows * sizeof(uint32_t));
 	thrust::device_ptr<uint32_t> d_hash_keys(hash_keys);
 	thrust::fill(d_hash_keys, d_hash_keys + num_key_rows, (int) 0);
 
@@ -125,53 +132,78 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	output_values = new T[num_output_rows*num_value_columns];
 
 	//copy back unique keys
-	for (int i = 0; i<num_key_columns; i++){//i represents column of key output
-		thrust::copy_n(thrust::make_permutation_iterator(key_columns + (i*num_output_rows), key_locations.begin()), num_output_rows, output_keys);
+	// for (int i = 0; i<num_key_columns; i++){//i represents column of key output
+	// 	thrust::permutation_iterator<ElementIterator,IndexIterator> sorted_col(key_columns + (i*num_output_rows),key_locations.begin());
+
+	// 	// thrust::copy_n(thrust::make_permutation_iterator(key_columns + (i*num_output_rows), key_locations.begin()), num_output_rows, output_keys);
+	// }
+
+	for (int i = 0; i<num_key_columns; i++){//i represents column of key 
+		thrust::device_vector<T> d_columns(key_columns + (i*num_output_rows), key_columns + ((i+1)*num_output_rows));
+		thrust::permutation_iterator<ElementIterator,IndexIterator> data(d_columns.begin(),key_locations.begin());
+		thrust::copy_n(data, num_key_rows, output_keys+i*num_output_rows);
 	}
+	
+
+	T* ones;
+	cudaMalloc((void **) &ones, num_key_rows * sizeof(T));
+	thrust::device_ptr<T> d_ones(ones);
+	thrust::fill(d_ones, d_ones + num_key_rows, (T) 1);
 
 	//iterate though all columns of the matrix. Perfrom the operation corresponding to that column
 	for (int i = 0; i<num_ops; i++){//i represents column of output
 		//get this column of data. copy does [first, last) 
 		int start = i*num_value_rows;
-		// int end = (i+1)*num_value_rows;
+		int end = (i+1)*num_value_rows;
 		//the column is not sorted yet so use d_i to sort! 
 		// note: is this vector initialized with di?
 		thrust::device_vector<T> sorted_col(num_value_rows);
-		uint32_t* output_ptr;
-		cudaMalloc((void **) &output_ptr, num_value_rows * sizeof(T));
-		thrust::device_ptr<T> output(hash_keys);
-		thrust::copy_n(thrust::make_permutation_iterator(value_columns + start, d_i.begin()), num_value_rows, sorted_col.begin());
 
-		thrust::pair<int*,int*> n_end;
+		//make device pointers for 
+		T* out_ptr;
+		cudaMalloc((void **) &out_ptr, num_output_rows * sizeof(T));
+		thrust::device_ptr<T> d_output(out_ptr);	
+
+		T* outkey_ptr;
+		cudaMalloc((void **) &outkey_ptr, num_output_rows * sizeof(T));
+		thrust::device_ptr<T> d_output_keys(outkey_ptr);
+
+		thrust::device_vector<T> d_columns(value_columns + start,value_columns + end);
+		thrust::permutation_iterator<ElementIterator,IndexIterator> data(d_columns.begin(),d_i.begin());
+		thrust::copy_n(data, num_value_rows, sorted_col.begin());
+
 		thrust::equal_to<T> eq;
 		thrust::minimum<T> mn;
 		thrust::maximum<T> mx;
 		thrust::plus<T> pls;
 		switch(ops[i]){
 			case rmax:
-				n_end = thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, thrust::make_constant_iterator(1), output_keys, output, eq, mx);
+				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, d_ones, d_output_keys, d_output, mx);
 				break;
 			case rmin:
-				n_end = thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, thrust::make_constant_iterator(1), output_keys, output, eq, mn);
+				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, thrust::make_constant_iterator(1), d_output_keys, d_output, eq, mn);
 				break;
 			case rsum:
-				n_end = thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, sorted_col.begin(), output_keys, output);
+				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, sorted_col.begin(), d_output_keys, d_output);
 				break;
 			case rcount:
-				n_end = thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, thrust::make_constant_iterator(1), output_keys, output, eq, pls);
+				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, thrust::make_constant_iterator(1), d_output_keys, d_output, eq, pls);
 				break;
 			case rmean:
-				thrust::device_vector<T>  output_sums(num_output_rows);
+				T* sums_ptr;
+				cudaMalloc((void **) &sums_ptr, num_output_rows * sizeof(T));
+				thrust::device_ptr<T> d_output_sums(sums_ptr);
 				//get count for each key
-				n_end = thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, thrust::make_constant_iterator(1), output_keys, output, eq, pls);
+				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, thrust::make_constant_iterator(1), d_output_keys, d_output, eq, pls);
 				//Get sum for each key
-				n_end = thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, sorted_col.begin(), output_keys, output_sums);
+				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_columns, sorted_col.begin(), d_output_keys, d_output_sums);
 				//Perform division: Sums/Counts
 				thrust::divides<T> div;
-				thrust::transform(output, output + n_end.first, output_sums, output, div);
+				thrust::transform(d_output, d_output + num_output_rows, d_output_sums, d_output, div);
 				break;
 		}
 		int output_start = i*num_output_rows;
-		thrust::copy(output, output + n_end.first, output_values + output_start);
+		thrust::copy(d_output, d_output + num_output_rows, output_values + output_start);
+		cudaFree(&d_output);
 	}
 }
