@@ -114,7 +114,7 @@ void cpuGroupby::groupby() {
 
     sort();
     getNumGroups();
-    printData();
+    // printData();
     
     allocResultArray();
     getGroupPtr();
@@ -383,11 +383,15 @@ bool cpuGroupby::validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows)
         cout << "FAILED - CPU Rows: " << numGroups << " GPU Rows: " << GPUOutputRows << endl;
         return false;
     }
+    // cout << "GPU:CPU"<<endl;
     for (int i=0; i<num_value_columns*numGroups; i++) {
-        if (GPUValues[i] != value_columns[i]) {
+        // cout << GPUValues[i] << ":" << output_values[i] << endl;
+        if (GPUValues[i] != output_values[i]) {
+            cout << "FAILED - CPU data != GPU data " << endl;
             return false;
         }
     }
+    cout << "PASSED - CPU data == GPU data " << endl;   
     return true;
 }
 

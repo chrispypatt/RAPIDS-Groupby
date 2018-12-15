@@ -65,7 +65,7 @@ __global__ void identify_bound(T* key_columns, int num_key_rows, int num_key_col
 template <typename T>
 void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	T* value_columns, int num_value_columns, int num_value_rows,
-	reductionType* ops, int num_ops, T* output_keys, T* output_values)
+	reductionType* ops, int num_ops, T* output_keys, T* output_values, int &num_output_rows)
 {
 	//Perform hashing
 	uint32_t dimBlock = BLOCK_SIZE;
@@ -119,7 +119,7 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	thrust::copy(d_i.begin(), d_i.end(), key_locations.begin()); 
 	thrust::pair<thrust::device_vector<uint32_t>::iterator, thrust::device_vector<int>::iterator> end = thrust::unique_by_key(d_unique_keys.begin(), d_unique_keys.end(), key_locations.begin());
 
-	int num_output_rows = *end.second;
+	num_output_rows = *end.second;
 
 	//setup output arrays
 	// output_keys = (int *)realloc(output_keys, num_output_rows*num_key_columns * sizeof(T));

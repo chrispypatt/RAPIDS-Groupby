@@ -49,10 +49,10 @@ __constant__ uint32_t  MurmurHash3_x64_32_tab[256] = {
 
 template <typename T>
 __device__ uint8_t retrieve_byte(const T* key_columns,
-                 const int num_key_columns,
-                 const int num_key_rows,
-				 const size_t idx,
-				 const size_t current_byte)
+    const int num_key_columns,
+    const int num_key_rows,
+    const size_t idx,
+    const size_t current_byte)
 {
   size_t column_idx = current_byte / sizeof(T);
   size_t shift = 8 * (current_byte % sizeof(T));
@@ -62,10 +62,10 @@ __device__ uint8_t retrieve_byte(const T* key_columns,
 
 template <typename T>
 __global__ void MurmurHash3_x64_32_hash(const T* key_columns,
-                           const int num_key_columns,
-                           const int num_key_rows,
-                           const uint32_t MurmurHash3_x64_32_tab[],
-    					   uint32_t MurmurHash3_x64_32_result[], uint32_t seed)
+    const int num_key_columns,
+    const int num_key_rows,
+    const uint32_t MurmurHash3_x64_32_tab[],
+    uint32_t MurmurHash3_x64_32_result[], uint32_t seed)
 {
     uint32_t hash = seed;
     // num of bytes in the message
