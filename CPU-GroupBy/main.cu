@@ -25,14 +25,16 @@ int main(int argc, const char * argv[]) {
 
     
     // Insert GPU function calls here...
-    int *output_keys, *output_values;
+    int *gpu_output_keys, *gpu_output_values;
+    gpu_output_keys = (int *)malloc(slowGroupby.num_key_rows*slowGroupby.num_key_columns * sizeof(int));
+    gpu_output_values = (int *)malloc(slowGroupby.num_value_rows*slowGroupby.num_value_columns * sizeof(int));
     groupby_GPU(slowGroupby.key_columns, slowGroupby.num_key_columns,
                 slowGroupby.num_key_rows, slowGroupby.value_columns, 
                 slowGroupby.num_value_columns, slowGroupby.num_value_rows, 
                 slowGroupby.ops, slowGroupby.num_ops,
-                output_keys, output_values); 
+                gpu_output_keys, gpu_output_values); 
     
-    //slowGroupby.printResults();
+    slowGroupby.printGPUResults(gpu_output_keys, gpu_output_values);
     
     // Validating the GPU Result
     // To - do

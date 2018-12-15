@@ -342,6 +342,40 @@ void cpuGroupby::printResults() {
     cout << "End Printing Results" << endl;
 }
 
+void cpuGroupby::printGPUResults(int* GPU_output_keys, int* GPU_output_values){
+    cout << "Printing GPU Results..." << endl;
+    
+    for (int cRow=0; cRow<numGroups; cRow++) {
+        //print keys for a row
+        for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
+            if (keyIdx == 0) {
+                cout << "{";
+            }
+            cout << GPU_output_keys[numGroups*keyIdx + cRow];
+            if(keyIdx != num_key_columns-1) {
+                cout << ":";
+            } else {
+                cout << "}:";
+            }
+        }
+        // Print values for a row
+        for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
+            if (valIdx == 0) {
+                cout << "{";
+            }
+            cout << GPU_output_values[numGroups*valIdx + cRow];
+            if(valIdx != num_value_columns-1) {
+                cout << ":";
+            } else {
+                cout << "}";
+            }
+        }
+        cout << endl;
+    }
+    
+    cout << "End GPU Printing Results" << endl;
+}
+
 // To do: Verify function w GPU code
 bool cpuGroupby::validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows) {
     //ASSUMING THE GPU RESULT IS SORTED

@@ -63,6 +63,8 @@ public:
     void swapAtRow(int cRow);
     void getGroupPtr();
     void writeOutputKeys();
+    void printGPUResults(int* GPU_output_keys, int* GPU_output_values);
+
     
     //Constructor / destructor functions
     cpuGroupby(int numKeys, int numValues, int numRows);

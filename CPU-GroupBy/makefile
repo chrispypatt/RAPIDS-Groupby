@@ -1,9 +1,9 @@
 # Makefile for GPU GroupBy Project
 # EE-5351 Fall 2018
 NVCC        = nvcc
-NVCC_FLAGS  = -I/usr/local/cuda/include -gencode=arch=compute_60,code=\"sm_60\"
+NVCC_FLAGS  = -I/usr/local/cuda/include -gencode=arch=compute_60,code=\"sm_60\" --relocatable-device-code true
 ifdef dbg
-	NVCC_FLAGS  += -g -G
+	NVCC_FLAGS  += -g -G 
 else
 	NVCC_FLAGS  += -O3
 endif
@@ -17,7 +17,7 @@ default: $(EXE)
 main.o: main.cu cpuGroupby.h
 	$(NVCC) -c -o $@ main.cu $(NVCC_FLAGS)
 
-HashFunc.o: HashFunc.cu
+HashFunc.o: HashFunc.cu HashFunc.cuh
 	$(NVCC) -c -o $@ HashFunc.cu $(NVCC_FLAGS)
 
 groupby.o: groupby.cu 

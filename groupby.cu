@@ -9,6 +9,8 @@
 #include <thrust/pair.h>
 #include <thrust/execution_policy.h>
 #include "cpuGroupby.h"
+#include <stdint.h>
+
 #include "HashFunc.cu"
 #include <thrust/iterator/permutation_iterator.h>
 
