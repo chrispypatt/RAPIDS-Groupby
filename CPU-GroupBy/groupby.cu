@@ -27,7 +27,7 @@ struct my_sort_functor
     bool operator()(const int idx1, const int idx2) const
     {
         bool flip = false;
-        for (auto i = 0; i < num_columns; ++i) {
+        for (int i = 0; i < num_columns; ++i) {
             T data1 = key_data[i * num_rows + idx1];
             T data2 = key_data[i * num_rows + idx2];
             if (data1 > data2) break;
@@ -88,14 +88,11 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	int * d_i_raw = thrust::raw_pointer_cast(d_i.data());
 
 	// sort the index according to values in d_keys and distributed values to d_sorted_keys
-
-	thrust::sort(d_i.begin(), d_i.end(), my_sort_functor(num_key_columns, num_key_rows, d_keys_raw));
+	thrust::sort(d_i.begin(), d_i.end(), my_sort_functor<T>(num_key_columns, num_key_rows, d_keys_raw));
 
 	for (int i = 0; i<num_key_columns; i++){//i represents column of key 
-
-		thrust::permutation_iterator<ElementIterator,IndexIterator> data(key_columns + (i*num_output_rows),key_locations.data());
+		thrust::permutation_iterator<ElementIterator,IndexIterator> data(key_columns+(i*num_key_rows), d_i.data());
 		thrust::copy_n(data, num_key_rows, d_sorted_keys.begin()+i*num_key_rows);
-
 	}
 	
 
@@ -105,12 +102,14 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	thrust::fill(d_hash_keys, d_hash_keys + num_key_rows, (int) 0);
 
 	// check the boundary then scan the boundary
-
 	identify_bound<<<dimGrid, dimBlock>>>(d_sorted_keys_raw, num_key_rows, num_key_columns, hash_keys);
-	thrust::exclusive_scan(thrust::device, d_hash_keys, d_hash_keys + num_key_rows, d_hash_keys);
+	thrust::inclusive_scan(thrust::device, d_hash_keys, d_hash_keys + num_key_rows, d_hash_keys);
 
 	// Now the keys in d_sorted_keys should be sorted and d_hash_keys will have identical value for identical keys, note the value is already sorted
 	// so can run reduce_by_key directly on the sorted keys to get unique keys
+
+	// reducebykey
+	// d_sorted_keys
 
 	//create index array for sorting. 
 	thrust::device_vector<int> key_locations(num_value_rows);
@@ -168,6 +167,7 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 		cudaMalloc((void **) &outkey_ptr, num_output_rows * sizeof(T));
 		thrust::device_ptr<T> d_output_keys(outkey_ptr);
 
+		//copy one column to device vecotr for calculation
 		thrust::device_vector<T> d_columns(value_columns + start,value_columns + end);
 		thrust::permutation_iterator<ElementIterator,IndexIterator> data(d_columns.begin(),d_i.begin());
 		thrust::copy_n(data, num_value_rows, sorted_col.begin());
