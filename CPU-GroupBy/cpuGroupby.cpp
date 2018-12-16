@@ -48,6 +48,70 @@ void cpuGroupby::sort() {
     }
 }
 
+// QUICKSORT STUFF
+// Based on https://www.geeksforgeeks.org/quick-sort/
+void cpuGroupby::quickSort(int* array, int lowIdx, int highIdx) {
+    if (lowIdx < highIdx) {
+        /* pi is partitioning index, arr[pi] is now
+         at right place */
+        int pi = partition(array, lowIdx, highIdx);
+        
+        quickSort(array, lowIdx, pi - 1);  // Before pi
+        quickSort(array, pi + 1, highIdx); // After pi
+    }
+}
+
+int cpuGroupby::partition (int* array, int lowIdx, int highIdx) {
+    // pivot (Element to be placed at right position)
+    int pivotIdx = highIdx;
+    
+    int i = (lowIdx - 1);  // Index of smaller element
+    for (int j = lowIdx; j <= highIdx-1; j++) {
+        // If current element is smaller than or
+        // equal to pivot
+        if ( keyAtFirstIndexIsBigger(pivotIdx,j) ) {
+            i++;    // increment index of smaller element
+            swapValuesAtRows(i, j);
+        }
+    }
+    
+    swapValuesAtRows(i+1, highIdx);
+    return (i + 1);
+}
+
+void cpuGroupby::swapValuesAtRows(int rowOne, int rowTwo) {
+    int tempVal;
+    //Swap the keys
+    for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
+        tempVal = key_columns[keyIdx*num_key_rows + rowOne];
+        key_columns[keyIdx*num_key_rows + rowOne] = key_columns[keyIdx*num_key_rows + rowTwo];
+        key_columns[keyIdx*num_key_rows + rowTwo] = tempVal;
+    }
+    //Swap the values
+    for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
+        tempVal = value_columns[valIdx*num_value_rows + rowOne];
+        value_columns[valIdx*num_value_rows +rowOne]=value_columns[valIdx*num_value_rows +rowTwo];
+        value_columns[valIdx*num_value_rows + rowTwo] = tempVal;
+    }
+}
+
+bool cpuGroupby::keyAtFirstIndexIsBigger(int rowOne, int rowTwo) {
+    int keyIdx=0;
+    for (keyIdx=0; keyIdx<num_key_columns && key_columns[keyIdx*num_key_rows + rowOne] == key_columns[keyIdx*num_key_rows + rowTwo]; keyIdx++);
+    // fix for equal keys
+    if(keyIdx >= num_key_columns) {
+        return false;
+    }
+    
+    //see if key at cRow is greater than key at cRow+1
+    if (key_columns[keyIdx*num_key_rows + rowOne] > key_columns[keyIdx*num_key_rows + rowTwo]) {
+        return true;
+    } else {
+        return false;
+    }
+}
+// END QUICKSORT STUFF
+
 bool cpuGroupby::nextKeyBigger(int cRow) {
     int keyIdx=0;
     
@@ -118,7 +182,9 @@ void cpuGroupby::groupby() {
         ops[i] = rsum;
     }
 
-    sort();
+    //sort();
+    quickSort(key_columns, 0, num_key_rows);
+    
     getNumGroups();
     // printData();
     

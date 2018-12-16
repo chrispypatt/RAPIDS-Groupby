@@ -40,10 +40,16 @@ public:
     
     // Functions
     void fillRand(int distinctKeys, int distinctVals);
-    void sort();
+    void sort();	//OLD, SLOW
     void groupby();
     void getNumGroups();
     void doReductionOps();
+    
+    //Quicksort Functions
+    void quickSort(int* array, int lowIdx, int highIdx);
+    int partition (int* array, int lowIdx, int highIdx);
+    void swapValuesAtRows(int rowOne, int rowTwo);
+    bool keyAtFirstIndexIsBigger(int rowOne, int rowTwo);
     
     // Reduction Functions
     // To do: add sum function
