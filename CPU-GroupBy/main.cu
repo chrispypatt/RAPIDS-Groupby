@@ -18,7 +18,7 @@ using namespace std;
 int main(int argc, const char * argv[]) {
         clock_t start, end;
 
-        int num_rows = 100;
+        int num_rows = 500000;
         int num_key_cols = 2;
         int num_val_cols = 3;
         int num_distinct_keys = 3;
