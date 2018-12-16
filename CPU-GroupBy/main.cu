@@ -74,12 +74,3 @@ int main(int argc, const char * argv[]) {
         delete [] original_key_columns;
         return 0;
 }
-
-/*
-groupby( T* key_columns[], int num_key_columns, int num_key_rows,
-        T* value_columns[], int num_value_columns, int num_value_rows,
-        reduction_op ops[], int num_ops, T* output_keys[], T* output_values[]) {
-    
-    
-}
-*/

@@ -87,13 +87,7 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	int * d_i_raw = thrust::raw_pointer_cast(d_i.data());
 
 	// sort the index according to values in d_keys and distributed values to d_sorted_keys
-	thrust::sort(d_i.begin(), d_i.end(), my_sort_functor<T>(num_key_columns, num_key_rows, d_keys_raw));
-
-	for (int i = 0; i<num_key_columns; i++){//i represents column of key 
-		thrust::device_vector<T> d_key_column(key_columns + (i*num_key_rows),key_columns + ((i+1)*num_key_rows));
-		thrust::permutation_iterator<ElementIterator,IndexIterator> iter(d_key_column.begin(), d_i.begin());
-		thrust::copy_n(iter, num_key_rows, d_sorted_keys.begin()+i*num_key_rows);
-	}	
+	thrust::sort(d_i.begin(), d_i.end(), my_sort_functor<T>(num_key_columns, num_key_rows, d_keys_raw));	
 
 	uint32_t* hash_keys;
 	cudaMalloc((void **) &hash_keys, num_key_rows * sizeof(uint32_t));
@@ -106,9 +100,6 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 
 	// Now the keys in d_sorted_keys should be sorted and d_hash_keys will have identical value for identical keys, note the value is already sorted
 	// so can run reduce_by_key directly on the sorted keys to get unique keys
-
-	// reducebykey
-	// d_sorted_keys
 
 	//create index array for sorting. 
 	thrust::device_vector<int> key_locations(num_value_rows);
@@ -133,8 +124,6 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 		thrust::permutation_iterator<ElementIterator,IndexIterator> data(d_column.begin(),key_locations.begin());
 		thrust::copy_n(data, num_output_rows, output_keys+i*num_output_rows);
 	}
-
-    
 
 	T* ones;
 	cudaMalloc((void **) &ones, num_key_rows * sizeof(T));
@@ -171,10 +160,10 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 		thrust::plus<T> pls;
 		switch(ops[i]){
 			case rmax:
-				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_rows, d_ones, d_output_keys, d_output, mx);
+				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_rows, sorted_col.begin(), d_output_keys, d_output,eq, mx);
 				break;
 			case rmin:
-				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_rows, thrust::make_constant_iterator(1), d_output_keys, d_output, eq, mn);
+				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_rows, sorted_col.begin(), d_output_keys, d_output, eq, mn);
 				break;
 			case rsum:
 				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_rows, sorted_col.begin(), d_output_keys, d_output,eq,pls);
@@ -189,7 +178,7 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 				//get count for each key
 				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_rows, thrust::make_constant_iterator(1), d_output_keys, d_output, eq, pls);
 				//Get sum for each key
-				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_rows, sorted_col.begin(), d_output_keys, d_output_sums);
+				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_rows, sorted_col.begin(), d_output_keys, d_output_sums,eq,pls);
 				//Perform division: Sums/Counts
 				thrust::divides<T> div;
 				thrust::transform(d_output, d_output + num_output_rows, d_output_sums, d_output, div);

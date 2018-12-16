@@ -210,7 +210,7 @@ void cpuGroupby::groupby() {
     //max, min, sum, count, and arithmetic mean
     //Init reduction operation list (rmax for testing)
     for (int i=0; i<num_value_columns; i++) {
-        ops[i] = rsum;
+        ops[i] = rcount;
     }
 
     //sort();

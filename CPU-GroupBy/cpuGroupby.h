@@ -81,12 +81,4 @@ public:
     bool validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows);
 };
 
-// Model after this:
-/*
- groupby( T* key_columns[], int num_key_columns, int num_key_rows,
- T* value_columns[], int num_value_columns, int num_value_rows,
- reduction_op ops[], int num_ops, T* output_keys[], T* output_values[]) {
- }
- */
-
 #endif /* cpuGroupby_hpp */
