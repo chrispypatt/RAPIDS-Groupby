@@ -41,6 +41,7 @@ public:
     // Functions
     void fillRand(int distinctKeys, int distinctVals);
     void sort();	//OLD, SLOW
+    void libsort();     //use std::sort
     void groupby();
     void getNumGroups();
     void doReductionOps();

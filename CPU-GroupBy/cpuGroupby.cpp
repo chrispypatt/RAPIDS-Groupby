@@ -10,6 +10,9 @@
 #include "cpuGroupby.h"
 #include <time.h>
 #include <cstdlib>
+#include <vector>
+#include <numeric>
+#include <algorithm>
 
 void cpuGroupby::fillRand(int distinctKeys, int distinctVals) {
     srand((unsigned int)time(NULL));
@@ -59,6 +62,34 @@ void cpuGroupby::quickSort(int* array, int lowIdx, int highIdx) {
         quickSort(array, lowIdx, pi - 1);  // Before pi
         quickSort(array, pi + 1, highIdx); // After pi
     }
+}
+
+void cpuGroupby::libsort() {
+  std::vector<int> idx(num_key_rows);
+  std::iota(idx.begin(), idx.end(), 0);
+  std::sort(idx.begin(), idx.end(), 
+	    [=] (const int idx1, const int idx2) {
+	      for (int i = 0; i < num_key_columns; ++i) {
+		int data1 = key_columns[i * num_key_rows + idx1];
+		int data2 = key_columns[i * num_key_rows + idx2];
+		if (data1 > data2) return false;
+		if (data1 < data2) return true;
+	      }
+	      return false;
+	    });
+  std::vector<int> new_row(num_key_rows);
+  for (int i = 0; i < num_key_columns; ++i) {
+    for (int j = 0; j < num_key_rows; ++j) {
+      new_row[j] = key_columns[i * num_key_rows + idx[j]];
+    }
+    std::copy(new_row.begin(), new_row.end(), key_columns + i * num_key_rows);
+  }
+  for (int i = 0; i < num_value_columns; ++i) {
+    for (int j = 0; j < num_value_rows; ++j) {
+      new_row[j] = value_columns[i * num_value_rows + idx[j]];
+    }
+    std::copy(new_row.begin(), new_row.end(), value_columns + i * num_value_rows);
+  }
 }
 
 int cpuGroupby::partition (int* array, int lowIdx, int highIdx) {
@@ -183,7 +214,8 @@ void cpuGroupby::groupby() {
     }
 
     //sort();
-    quickSort(key_columns, 0, num_key_rows);
+    //quickSort(key_columns, 0, num_key_rows);
+    libsort();
     
     getNumGroups();
     // printData();
