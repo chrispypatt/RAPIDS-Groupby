@@ -211,8 +211,8 @@ void cpuGroupby::rMin(int valIdx) {
 }
 
 void cpuGroupby::rMean(int valIdx) {
-    float sum=0;
-    float mean=0;
+    int sum=0;
+    int mean=0;
     for (int groupIdx=1; groupIdx<numGroups; groupIdx++) {
         sum = 0;
         for (int subIdx=0; subIdx<groupPtr[groupIdx]-groupPtr[groupIdx-1]; subIdx++) {
@@ -234,7 +234,7 @@ void cpuGroupby::rMean(int valIdx) {
 }
 
 void cpuGroupby::rSum(int valIdx) {
-    float sum=0;
+    int sum=0;
     for (int groupIdx=1; groupIdx<numGroups; groupIdx++) {
         sum = 0;
         for (int subIdx=0; subIdx<groupPtr[groupIdx]-groupPtr[groupIdx-1]; subIdx++) {
