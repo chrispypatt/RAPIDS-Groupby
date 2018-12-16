@@ -119,7 +119,7 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 	thrust::copy(d_i.begin(), d_i.end(), key_locations.begin()); 
 	thrust::pair<thrust::device_vector<uint32_t>::iterator, thrust::device_vector<int>::iterator> end = thrust::unique_by_key(d_unique_keys.begin(), d_unique_keys.end(), key_locations.begin());
 
-	num_output_rows = *end.second;
+	num_output_rows = end.second - d_unique_keys.begin();
 
 	//setup output arrays
 	// output_keys = (int *)realloc(output_keys, num_output_rows*num_key_columns * sizeof(T));
