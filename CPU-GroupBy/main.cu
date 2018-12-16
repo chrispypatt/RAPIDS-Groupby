@@ -34,13 +34,6 @@ int main(int argc, const char * argv[]) {
 
         slowGroupby.fillRand(num_distinct_keys, num_rows);
 
-        start = clock();
-
-        slowGroupby.groupby();
-
-        end = clock(); 
-        float cpu_duration = ((float)end-(float)start)/CLOCKS_PER_SEC; 
-
         // Insert GPU function calls here...
         int *gpu_output_keys, *gpu_output_values;
         int gpu_output_rows = 0;
@@ -58,6 +51,13 @@ int main(int argc, const char * argv[]) {
 
         end = clock(); 
         float gpu_duration = ((float)end-(float)start)/CLOCKS_PER_SEC; 
+
+        start = clock();
+
+        slowGroupby.groupby();
+
+        end = clock(); 
+        float cpu_duration = ((float)end-(float)start)/CLOCKS_PER_SEC; 
 
         cout << "CPU time: " << cpu_duration << "s" << endl;
         cout << "GPU time: " << gpu_duration << "s" << endl;
