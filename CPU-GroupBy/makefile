@@ -2,6 +2,7 @@
 # EE-5351 Fall 2018
 NVCC        = nvcc
 NVCC_FLAGS  = -I/usr/local/cuda/include -gencode=arch=compute_60,code=\"sm_60\" --relocatable-device-code true
+CXX_FLAGS   = -std=c++11
 ifdef dbg
 	NVCC_FLAGS  += -g -G 
 else
@@ -24,7 +25,7 @@ groupby.o: groupby.cu
 	$(NVCC) -c -o $@ groupby.cu $(NVCC_FLAGS)
 
 cpuGroupby.o: cpuGroupby.cpp cpuGroupby.h
-	$(NVCC) -c -o $@ cpuGroupby.cpp $(NVCC_FLAGS)
+	$(NVCC) -c -o $@ cpuGroupby.cpp $(NVCC_FLAGS) $(CXX_FLAGS)
 
 $(EXE): $(OBJ)
 	$(NVCC) $(OBJ) -o $(EXE) $(LD_FLAGS) $(NVCC_FLAGS)
