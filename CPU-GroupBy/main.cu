@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <time.h>
+#include <algorithm>
 #include "cpuGroupby.h"
 
 #include "groupby.cu"
@@ -34,6 +35,18 @@ int main(int argc, const char * argv[]) {
 
         slowGroupby.fillRand(num_distinct_keys, num_rows);
 
+        int *original_key_columns = new int[num_key_cols*num_rows];
+        int *original_value_columns = new int[num_val_cols*num_rows];
+        std::copy(slowGroupby.key_columns, slowGroupby.key_columns + num_key_cols*num_rows, original_key_columns);
+        std::copy(slowGroupby.value_columns, slowGroupby.value_columns + num_val_cols*num_rows, original_value_columns);
+        
+        start = clock();
+
+        slowGroupby.groupby();
+
+        end = clock(); 
+        float cpu_duration = ((float)end-(float)start)/CLOCKS_PER_SEC; 
+
         // Insert GPU function calls here...
         int *gpu_output_keys, *gpu_output_values;
         int gpu_output_rows = 0;
@@ -42,8 +55,8 @@ int main(int argc, const char * argv[]) {
 
         start = clock();
 
-        groupby_GPU(slowGroupby.key_columns, slowGroupby.num_key_columns,
-                slowGroupby.num_key_rows, slowGroupby.value_columns, 
+        groupby_GPU(original_key_columns, slowGroupby.num_key_columns,
+                slowGroupby.num_key_rows, original_value_columns, 
                 slowGroupby.num_value_columns, slowGroupby.num_value_rows, 
                 slowGroupby.ops, slowGroupby.num_ops,
                 gpu_output_keys, gpu_output_values, gpu_output_rows); 
@@ -52,18 +65,13 @@ int main(int argc, const char * argv[]) {
         end = clock(); 
         float gpu_duration = ((float)end-(float)start)/CLOCKS_PER_SEC; 
 
-        start = clock();
-
-        slowGroupby.groupby();
-
-        end = clock(); 
-        float cpu_duration = ((float)end-(float)start)/CLOCKS_PER_SEC; 
-
         cout << "CPU time: " << cpu_duration << "s" << endl;
         cout << "GPU time: " << gpu_duration << "s" << endl;
 
         slowGroupby.validGPUResult(gpu_output_keys, gpu_output_values, gpu_output_rows);
 
+        delete [] original_value_columns;
+        delete [] original_key_columns;
         return 0;
 }
 
