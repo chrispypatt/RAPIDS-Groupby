@@ -50,7 +50,13 @@ void cpuGroupby::sort() {
 
 bool cpuGroupby::nextKeyBigger(int cRow) {
     int keyIdx=0;
+    
     for (keyIdx=0; keyIdx<num_key_columns && key_columns[keyIdx*num_key_rows + cRow] == key_columns[keyIdx*num_key_rows + cRow+1]; keyIdx++);
+    // fix for equal keys
+    if(keyIdx >= num_key_columns) {
+    	return false;
+    }
+    
     //see if key at cRow is greater than key at cRow+1
     if (key_columns[keyIdx*num_key_rows + cRow] > key_columns[keyIdx*num_key_rows + cRow+1]) {
         return false;
