@@ -11,13 +11,17 @@
 #include <iostream>
 #include <time.h>
 #include <algorithm>
+#include <chrono>
 #include "cpuGroupby.h"
 
 #include "groupby.cu"
 
 using namespace std;
 int main(int argc, const char * argv[]) {
-        clock_t start, end;
+        
+
+	using Time = std::chrono::high_resolution_clock;
+	using fsec = std::chrono::duration<float>;
 
         int num_rows = 100000;
         int num_key_cols = 2;
@@ -42,12 +46,12 @@ int main(int argc, const char * argv[]) {
         std::copy(slowGroupby.key_columns, slowGroupby.key_columns + num_key_cols*num_rows, original_key_columns);
         std::copy(slowGroupby.value_columns, slowGroupby.value_columns + num_val_cols*num_rows, original_value_columns);
         
-        start = clock();
+        auto start = Time::now();
 
         slowGroupby.groupby();
 
-        end = clock(); 
-        float cpu_duration = ((float)end-(float)start)/CLOCKS_PER_SEC; 
+        auto end = Time::now(); 
+        fsec cpu_duration = end - start;
 
         // Insert GPU function calls here...
         int *gpu_output_keys, *gpu_output_values;
@@ -55,7 +59,7 @@ int main(int argc, const char * argv[]) {
         gpu_output_keys = (int *)malloc(slowGroupby.num_key_rows*slowGroupby.num_key_columns * sizeof(int));
         gpu_output_values = (int *)malloc(slowGroupby.num_value_rows*slowGroupby.num_value_columns * sizeof(int));
 
-        start = clock();
+        start = Time::now();
 
         groupby_GPU(original_key_columns, slowGroupby.num_key_columns,
                 slowGroupby.num_key_rows, original_value_columns, 
@@ -64,11 +68,11 @@ int main(int argc, const char * argv[]) {
                 gpu_output_keys, gpu_output_values, gpu_output_rows); 
         slowGroupby.printGPUResults(gpu_output_keys, gpu_output_values);
 
-        end = clock(); 
-        float gpu_duration = ((float)end-(float)start)/CLOCKS_PER_SEC; 
+        end = Time::now();
+        fsec gpu_duration = end - start;
 
-        cout << "CPU time: " << cpu_duration << "s" << endl;
-        cout << "GPU time: " << gpu_duration << "s" << endl;
+        cout << "CPU time: " << cpu_duration.count() << "s" << endl;
+        cout << "GPU time: " << gpu_duration.count() << "s" << endl;
 
         slowGroupby.validGPUResult(gpu_output_keys, gpu_output_values, gpu_output_rows);
 

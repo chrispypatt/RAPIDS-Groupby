@@ -16,7 +16,7 @@ OBJ	        = main.o cpuGroupby.o groupby.o HashFunc.o
 default: $(EXE)
 
 main.o: main.cu cpuGroupby.h
-	$(NVCC) -c -o $@ main.cu $(NVCC_FLAGS)
+	$(NVCC) -c -o $@ main.cu $(NVCC_FLAGS) $(CXX_FLAGS)
 
 HashFunc.o: HashFunc.cu HashFunc.cuh
 	$(NVCC) -c -o $@ HashFunc.cu $(NVCC_FLAGS)
