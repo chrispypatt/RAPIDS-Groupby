@@ -37,7 +37,7 @@ int main(int argc, const char * argv[]) {
                 num_rows = atoi(argv[1]);
                 num_key_cols = atoi(argv[2]);
                 num_val_cols = atoi(argv[3]);
-                num_distinct_keys = atoi(argv[4]);
+                num_distinct_keys = atoi(argv[4]) - 1;
         }
         // Setting up the CPU groupby
         cpuGroupby slowGroupby(num_key_cols, num_val_cols, num_rows);

@@ -11,7 +11,7 @@ Command line usage:
 
 ./groupby
 
-will use the default setting: 100000 data entries, 2 key_columns, 3 row_columns
+will use the default setting: 100000 data entries, 2 key_columns, 3 row_columns, and 4 distinct key per column
 			
 ./groupby <num_rows>
 
@@ -19,9 +19,14 @@ will use the default column settings and use the argument as number of data entr
 
 ./groupby <num_rows> <key_cols> <val_cols>
 
-will use all the three arguments to set up the data.
+will use num_rows as data entries, key_cols as number of key columns and row_cols as number of row columns
+while maintaining 4 distinct key per column
 
-Notice: The number of distinct keys in each column is 4 (0~3), so n key_columns will generate 4^n distinct keys.
+./groupby <num_rows> <key_cols> <val_cols> <distinct_keys_per_col>
+
+will use all the parameters to populate the data
+
+Notice: If the number of distinct keys in each column is m, n key_columns will generate m^n distinct keys.
 
 The program will populate random data, compute on CPU and GPU then validate the results.
 
