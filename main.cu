@@ -9,14 +9,13 @@
 //  one key column and one value column.
 
 #include <iostream>
-#include <time.h>
 #include <algorithm>
 #include <chrono>
+#include <vector>
+#include <string>
 #include "cpuGroupby.h"
-
 #include "groupby.cu"
 
-using namespace std;
 int main(int argc, const char * argv[]) {
         
 
@@ -26,19 +25,25 @@ int main(int argc, const char * argv[]) {
         int num_rows = 100000;
         int num_key_cols = 2;
         int num_val_cols = 3;
-        int num_distinct_keys = 3;
+        int num_distinct_keys = 10;
+	std::vector<std::string> args(argv, argv+argc);
         if (argc == 2){
-                num_rows = atoi(argv[1]);
-        }else if(argc ==4){
-                num_rows = atoi(argv[1]);
-                num_key_cols = atoi(argv[2]);
-                num_val_cols = atoi(argv[3]);
-        }else if(argc ==5){
-                num_rows = atoi(argv[1]);
-                num_key_cols = atoi(argv[2]);
-                num_val_cols = atoi(argv[3]);
-                num_distinct_keys = atoi(argv[4]) - 1;
-        }
+	  num_rows = stoi(args.at(1));
+        } else if(argc == 4){
+	  num_rows = stoi(args.at(1));
+	  num_key_cols = stoi(args.at(2));
+	  num_val_cols = stoi(args.at(3));
+        } else if(argc == 5){
+	  num_rows = stoi(args.at(1));
+	  num_key_cols = stoi(args.at(2));
+	  num_val_cols = stoi(args.at(3));
+	  num_distinct_keys = stoi(args.at(4));
+        } else {
+	  if (argc != 1) {
+	    std::cerr << "Invalid arguments" << std::endl;
+	    exit(1);
+	  }
+	}
         // Setting up the CPU groupby
         cpuGroupby slowGroupby(num_key_cols, num_val_cols, num_rows);
 
@@ -61,8 +66,8 @@ int main(int argc, const char * argv[]) {
         // Insert GPU function calls here...
         int *gpu_output_keys, *gpu_output_values;
         int gpu_output_rows = 0;
-        gpu_output_keys = (int *)malloc(slowGroupby.num_key_rows*slowGroupby.num_key_columns * sizeof(int));
-        gpu_output_values = (int *)malloc(slowGroupby.num_value_rows*slowGroupby.num_value_columns * sizeof(int));
+        gpu_output_keys = new int[slowGroupby.num_key_rows*slowGroupby.num_key_columns];
+        gpu_output_values = new int[slowGroupby.num_value_rows*slowGroupby.num_value_columns];
 
         start = Time::now();
 
@@ -77,8 +82,8 @@ int main(int argc, const char * argv[]) {
 
         fsec gpu_duration = end - start;
 
-        cout << "CPU time: " << cpu_duration.count() << " s" << endl;
-        cout << "GPU time: " << gpu_duration.count() << " s" << endl;
+	std::cout << "CPU time: " << cpu_duration.count() << " s" << std::endl;
+	std::cout << "GPU time: " << gpu_duration.count() << " s" << std::endl;
 
         slowGroupby.validGPUResult(gpu_output_keys, gpu_output_values, gpu_output_rows);
 

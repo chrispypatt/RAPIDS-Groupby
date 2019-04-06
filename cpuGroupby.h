@@ -11,9 +11,7 @@
 
 #include <iostream>
 
-using namespace std;
-
-    enum reductionType {rmin, rmax, rmean, rcount, rsum};
+enum reductionType {rmin, rmax, rmean, rcount, rsum};
 
 class cpuGroupby {
 public:
@@ -40,17 +38,10 @@ public:
     
     // Functions
     void fillRand(int distinctKeys, int distinctVals);
-    void sort();	//OLD, SLOW
     void libsort();     //use std::sort
     void groupby();
     void getNumGroups();
     void doReductionOps();
-    
-    //Quicksort Functions
-    void quickSort(int* array, int lowIdx, int highIdx);
-    int partition (int* array, int lowIdx, int highIdx);
-    void swapValuesAtRows(int rowOne, int rowTwo);
-    bool keyAtFirstIndexIsBigger(int rowOne, int rowTwo);
     
     // Reduction Functions
     // To do: add sum function
@@ -62,7 +53,6 @@ public:
     
     void printResults();
     void allocResultArray();
-    void freeResults();
     
     // ARBITRARY FUNCTIONS
     void printData();

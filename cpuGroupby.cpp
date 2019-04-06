@@ -8,60 +8,49 @@
 
 #include <iostream>
 #include "cpuGroupby.h"
-#include <time.h>
-#include <cstdlib>
 #include <vector>
 #include <numeric>
 #include <algorithm>
+#include <random>
+
+std::random_device rd;
+std::mt19937 gen(rd());
 
 void cpuGroupby::fillRand(int distinctKeys, int distinctVals) {
-    srand((unsigned int)time(NULL));
-    for (int cRow=0; cRow<num_key_rows; cRow++) {
-        //Fill the key columns in a row
-        for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
-            key_columns[keyIdx*num_key_rows + cRow] = rand() % (distinctKeys+1);
-        }
-        //Fill the value columns in a row
-        for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
-            value_columns[valIdx*num_value_rows + cRow] = rand() % (distinctVals+1);
-        }
+  const int maxKeyVal = 65535;
+  std::uniform_int_distribution<> keyVals(0, maxKeyVal);
+  std::uniform_int_distribution<> keys(0, distinctKeys - 1);
+  std::uniform_int_distribution<> vals(0, distinctVals - 1);
+  // Key array
+  std::vector<std::vector<int>> keyArray;
+  int currKey = 0;
+  while (currKey < distinctKeys) {
+    std::vector<int> random_key(num_key_columns);
+    for (auto& i: random_key) {
+      i = keyVals(gen);
     }
+    auto result = std::find(std::begin(keyArray), std::end(keyArray), random_key);
+    if (result == std::end(keyArray)) {
+      keyArray.push_back(random_key);
+      currKey++;
+    }
+  }
+  for (int cRow=0; cRow<num_key_rows; cRow++) {
+    int useKey = keys(gen);
+    //Fill the key columns in a row
+    for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
+      key_columns[keyIdx*num_key_rows + cRow] = keyArray[useKey][keyIdx];
+    }
+    //Fill the value columns in a row
+    for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
+      value_columns[valIdx*num_value_rows + cRow] = vals(gen);
+    }
+  }
 }
 
 void cpuGroupby::allocResultArray() {
-    output_keys = (int *)malloc(sizeof(int)*numGroups*num_key_columns);
-    output_values = (int *)malloc(sizeof(int)*numGroups*num_value_columns);
-}
-
-void cpuGroupby::freeResults() {
-    free(output_keys);
-    free(output_values);
-}
-
-// Sorting Functions
-void cpuGroupby::sort() {
-    for (int i = 0; i < num_key_rows-1; i++) {
-        // Last i elements are already in place
-        for (int j = 0; j < num_key_rows-i-1; j++) {
-            if (!nextKeyBigger(j)) {
-                // Swap j and j+1
-                swapAtRow(j);
-            }
-        }
-    }
-}
-
-// QUICKSORT STUFF
-// Based on https://www.geeksforgeeks.org/quick-sort/
-void cpuGroupby::quickSort(int* array, int lowIdx, int highIdx) {
-    if (lowIdx < highIdx) {
-        /* pi is partitioning index, arr[pi] is now
-         at right place */
-        int pi = partition(array, lowIdx, highIdx);
-        
-        quickSort(array, lowIdx, pi - 1);  // Before pi
-        quickSort(array, pi + 1, highIdx); // After pi
-    }
+    output_keys = new int[numGroups*num_key_columns];
+    output_values = new int[numGroups*num_value_columns];
 }
 
 void cpuGroupby::libsort() {
@@ -92,90 +81,6 @@ void cpuGroupby::libsort() {
   }
 }
 
-int cpuGroupby::partition (int* array, int lowIdx, int highIdx) {
-    // pivot (Element to be placed at right position)
-    int pivotIdx = highIdx;
-    
-    int i = (lowIdx - 1);  // Index of smaller element
-    for (int j = lowIdx; j <= highIdx-1; j++) {
-        // If current element is smaller than or
-        // equal to pivot
-        if ( keyAtFirstIndexIsBigger(pivotIdx,j) ) {
-            i++;    // increment index of smaller element
-            swapValuesAtRows(i, j);
-        }
-    }
-    
-    swapValuesAtRows(i+1, highIdx);
-    return (i + 1);
-}
-
-void cpuGroupby::swapValuesAtRows(int rowOne, int rowTwo) {
-    int tempVal;
-    //Swap the keys
-    for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
-        tempVal = key_columns[keyIdx*num_key_rows + rowOne];
-        key_columns[keyIdx*num_key_rows + rowOne] = key_columns[keyIdx*num_key_rows + rowTwo];
-        key_columns[keyIdx*num_key_rows + rowTwo] = tempVal;
-    }
-    //Swap the values
-    for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
-        tempVal = value_columns[valIdx*num_value_rows + rowOne];
-        value_columns[valIdx*num_value_rows +rowOne]=value_columns[valIdx*num_value_rows +rowTwo];
-        value_columns[valIdx*num_value_rows + rowTwo] = tempVal;
-    }
-}
-
-bool cpuGroupby::keyAtFirstIndexIsBigger(int rowOne, int rowTwo) {
-    int keyIdx=0;
-    for (keyIdx=0; keyIdx<num_key_columns && key_columns[keyIdx*num_key_rows + rowOne] == key_columns[keyIdx*num_key_rows + rowTwo]; keyIdx++);
-    // fix for equal keys
-    if(keyIdx >= num_key_columns) {
-        return false;
-    }
-    
-    //see if key at cRow is greater than key at cRow+1
-    if (key_columns[keyIdx*num_key_rows + rowOne] > key_columns[keyIdx*num_key_rows + rowTwo]) {
-        return true;
-    } else {
-        return false;
-    }
-}
-// END QUICKSORT STUFF
-
-bool cpuGroupby::nextKeyBigger(int cRow) {
-    int keyIdx=0;
-    
-    for (keyIdx=0; keyIdx<num_key_columns && key_columns[keyIdx*num_key_rows + cRow] == key_columns[keyIdx*num_key_rows + cRow+1]; keyIdx++);
-    // fix for equal keys
-    if(keyIdx >= num_key_columns) {
-    	return false;
-    }
-    
-    //see if key at cRow is greater than key at cRow+1
-    if (key_columns[keyIdx*num_key_rows + cRow] > key_columns[keyIdx*num_key_rows + cRow+1]) {
-        return false;
-    } else {
-        return true;
-    }
-}
-
-void cpuGroupby::swapAtRow(int cRow) {
-    int tempVal;
-    //Swap the keys
-    for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
-        tempVal = key_columns[keyIdx*num_key_rows + cRow];
-        key_columns[keyIdx*num_key_rows + cRow] = key_columns[keyIdx*num_key_rows + cRow+1];
-        key_columns[keyIdx*num_key_rows + cRow+1] = tempVal;
-    }
-    //Swap the values
-    for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
-        tempVal = value_columns[valIdx*num_value_rows + cRow];
-        value_columns[valIdx*num_value_rows + cRow]=value_columns[valIdx*num_value_rows + cRow+1];
-        value_columns[valIdx*num_value_rows + cRow+1] = tempVal;
-    }
-}
-
 void cpuGroupby::getNumGroups() {
     // Start with one group, each boundry is a "split" adding another group.
     numGroups = 1;
@@ -192,7 +97,7 @@ void cpuGroupby::getNumGroups() {
             }
         }
     }
-    cout << "numGroups: " << numGroups << endl;
+    std::cout << "numGroups: " << numGroups << std::endl;
 }
 
 void cpuGroupby::getGroupPtr() {
@@ -205,13 +110,27 @@ void cpuGroupby::getGroupPtr() {
     }
 }
 
+std::string opName(reductionType A) {
+  if (A == rmin) return "rmin";
+  else if (A == rmax) return "rmax";
+  else if (A == rmean) return "rmean";
+  else if (A == rcount) return "rcount";
+  else if (A == rsum) return "rsum";
+  else return "None";
+}
+
 // Groupby functions
 void cpuGroupby::groupby() {
     //max, min, sum, count, and arithmetic mean
     //Init reduction operation list (rmax for testing)
-    for (int i=0; i<num_value_columns; i++) {
-        ops[i] = rcount;
-    }
+  std::vector<reductionType> allOps{rmin, rmax, rmean, rcount, rsum};
+  std::uniform_int_distribution<> dis(0, 4);
+  std::cout << "Operations:";
+  for (int i=0; i<num_value_columns; i++) {
+    ops[i] = allOps[dis(gen)];
+    std::cout << opName(ops[i]) << " ";
+  }
+  std::cout << std::endl;
 
     //sort();
     //quickSort(key_columns, 0, num_key_rows);
@@ -379,135 +298,134 @@ void cpuGroupby::writeOutputKeys() {
 
 // Debug / Printing Functions
 void cpuGroupby::printData() {
-    cout << "Printing Data..." << endl;
+  std::cout << "Printing Data..." << std::endl;
     
-    for (int cRow=0; cRow<num_key_rows; cRow++) {
-        //print keys for a row
-        for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
-            if (keyIdx == 0) {
-                cout << "{";
-            }
-            cout << key_columns[num_key_rows*keyIdx + cRow];
-            if(keyIdx != num_key_columns-1) {
-                cout << ":";
-            } else {
-                cout << "}:";
-            }
-        }
-        // Print values for a row
-        for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
-            if (valIdx == 0) {
-                cout << "{";
-            }
-            cout << value_columns[num_value_rows*valIdx + cRow];
-            if(valIdx != num_value_columns-1) {
-                cout << ":";
-            } else {
-                cout << "}";
-            }
-        }
-        cout << endl;
+  for (int cRow=0; cRow<num_key_rows; cRow++) {
+    //print keys for a row
+    for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
+      if (keyIdx == 0) {
+	std::cout << "{";
+      }
+      std::cout << key_columns[num_key_rows*keyIdx + cRow];
+      if(keyIdx != num_key_columns-1) {
+	std::cout << ":";
+      } else {
+	std::cout << "}:";
+      }
     }
+    // Print values for a row
+    for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
+      if (valIdx == 0) {
+	std::cout << "{";
+      }
+      std::cout << value_columns[num_value_rows*valIdx + cRow];
+      if(valIdx != num_value_columns-1) {
+	std::cout << ":";
+      } else {
+	std::cout << "}";
+      }
+    }
+    std::cout << std::endl;
+  }
     
-    cout << "End Printing Data" << endl << endl;
+  std::cout << "End Printing Data" << std::endl << std::endl;
 }
 
 void cpuGroupby::printResults() {
-    cout << "Printing Results..." << endl;
+  std::cout << "Printing Results..." << std::endl;
     
     for (int cRow=0; cRow<numGroups; cRow++) {
         //print keys for a row
         for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
             if (keyIdx == 0) {
-                cout << "{";
+	      std::cout << "{";
             }
-            cout << output_keys[numGroups*keyIdx + cRow];
+	    std::cout << output_keys[numGroups*keyIdx + cRow];
             if(keyIdx != num_key_columns-1) {
-                cout << ":";
+	      std::cout << ":";
             } else {
-                cout << "}:";
+	      std::cout << "}:";
             }
         }
         // Print values for a row
         for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
             if (valIdx == 0) {
-                cout << "{";
+	      std::cout << "{";
             }
-            cout << output_values[numGroups*valIdx + cRow];
+	    std::cout << output_values[numGroups*valIdx + cRow];
             if(valIdx != num_value_columns-1) {
-                cout << ":";
+	      std::cout << ":";
             } else {
-                cout << "}";
+	      std::cout << "}";
             }
         }
-        cout << endl;
+	std::cout << std::endl;
     }
     
-    cout << "End Printing Results" << endl;
+    std::cout << "End Printing Results" << std::endl;
 }
 
 void cpuGroupby::printGPUResults(int* GPU_output_keys, int* GPU_output_values){
-    cout << "Printing GPU Results..." << endl;
+  std::cout << "Printing GPU Results..." << std::endl;
     
     for (int cRow=0; cRow<numGroups; cRow++) {
         //print keys for a row
         for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
             if (keyIdx == 0) {
-                cout << "{";
+	      std::cout << "{";
             }
-            cout << GPU_output_keys[numGroups*keyIdx + cRow];
+	    std::cout << GPU_output_keys[numGroups*keyIdx + cRow];
             if(keyIdx != num_key_columns-1) {
-                cout << ":";
+	      std::cout << ":";
             } else {
-                cout << "}:";
+	      std::cout << "}:";
             }
         }
         // Print values for a row
         for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
             if (valIdx == 0) {
-                cout << "{";
+	      std::cout << "{";
             }
-            cout << GPU_output_values[numGroups*valIdx + cRow];
+	    std::cout << GPU_output_values[numGroups*valIdx + cRow];
             if(valIdx != num_value_columns-1) {
-                cout << ":";
+	      std::cout << ":";
             } else {
-                cout << "}";
+	      std::cout << "}";
             }
         }
-        cout << endl;
+	std::cout << std::endl;
     }
     
-    cout << "End GPU Printing Results" << endl;
+    std::cout << "End GPU Printing Results" << std::endl;
 }
 
-// To do: Verify function w GPU code
 bool cpuGroupby::validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows) {
     //ASSUMING THE GPU RESULT IS SORTED
     if (GPUOutputRows != numGroups) {
-        cout << "FAILED - CPU Rows: " << numGroups << " GPU Rows: " << GPUOutputRows << endl;
+      std::cout << "FAILED - CPU Rows: " << numGroups << " GPU Rows: " << GPUOutputRows << std::endl;
         return false;
     }
     // cout << "GPU:CPU"<<endl;
     for (int i=0; i<num_value_columns*numGroups; i++) {
         // cout << GPUValues[i] << ":" << output_values[i] << endl;
         if (GPUValues[i] != output_values[i]) {
-            cout << "FAILED - CPU data != GPU data " << endl;
-            return false;
+	  std::cout << "FAILED - CPU data != GPU data " << std::endl;
+	  return false;
         }
     }
-    cout << "PASSED - CPU data == GPU data " << endl;   
+    std::cout << "PASSED - CPU data == GPU data " << std::endl;   
     return true;
 }
 
 // Contructor & Destructor Funcitons
 cpuGroupby::~cpuGroupby() {
     //Free the allocated memory
-    free(key_columns);
-    free(value_columns);
-    free(tempCol);
-    free(ops);
-    free(output_keys);
-    free(output_values);
+    delete [] key_columns;
+    delete [] value_columns;
+    delete [] tempCol;
+    delete [] ops;
+    delete [] output_keys;
+    delete [] output_values;
 }
 
 cpuGroupby::cpuGroupby(int numKeys, int numValues, int numRows) {
@@ -519,10 +437,10 @@ cpuGroupby::cpuGroupby(int numKeys, int numValues, int numRows) {
     num_ops = numValues;
     
     // Allocate key & value arrays
-    key_columns = (int *)malloc(sizeof(int)*num_key_columns*num_key_rows);
-    value_columns = (int *)malloc(sizeof(int)*num_value_columns*num_value_rows);
-    tempCol = (int *)malloc(sizeof(int)*num_value_rows);
-    ops = (reductionType*)malloc(sizeof(reductionType)*num_ops);
+    key_columns = new int[num_key_columns*num_key_rows];
+    value_columns = new int[num_value_columns*num_value_rows];
+    tempCol = new int[num_value_rows];
+    ops = new reductionType[num_ops];
 }
 
 
