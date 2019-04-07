@@ -187,7 +187,7 @@ void groupby_GPU(T* key_columns, int num_key_columns, int num_key_rows,
 				thrust::reduce_by_key(d_hash_keys, d_hash_keys + num_key_rows, sorted_col.begin(), d_output_keys, d_output_sums,eq,pls);
 				//Perform division: Sums/Counts
 				thrust::divides<T> div;
-				thrust::transform(d_output, d_output + num_output_rows, d_output_sums, d_output, div);
+				thrust::transform(d_output_sums, d_output_sums + num_output_rows, d_output, d_output, div);
 				break;
 		}
 		int output_start = i*num_output_rows;

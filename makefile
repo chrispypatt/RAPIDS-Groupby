@@ -4,7 +4,7 @@ NVCC        = nvcc
 NVCC_FLAGS  = -I/usr/local/cuda/include -gencode=arch=compute_60,code=\"sm_60\" --relocatable-device-code true
 CXX_FLAGS   = -std=c++11
 ifdef dbg
-	NVCC_FLAGS  += -g -G 
+	NVCC_FLAGS  += -g -G
 else
 	NVCC_FLAGS  += -O3
 endif
@@ -15,7 +15,7 @@ OBJ	        = main.o cpuGroupby.o groupby.o HashFunc.o
 
 default: $(EXE)
 
-main.o: main.cu cpuGroupby.h
+main.o: main.cu cpuGroupby.h groupby.cu
 	$(NVCC) -c -o $@ main.cu $(NVCC_FLAGS) $(CXX_FLAGS)
 
 HashFunc.o: HashFunc.cu HashFunc.cuh
