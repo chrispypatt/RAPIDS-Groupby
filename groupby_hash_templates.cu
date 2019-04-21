@@ -1,5 +1,7 @@
 #include <cstddef>
 
+#include "limits.cuh"
+
 // assume column major here
 template <typename T> __host__ __device__
 bool keyEqualCM(T* key_columns, size_t idx1, size_t idx2, size_t num_key_rows, size_t num_key_columns)
@@ -129,9 +131,9 @@ void initializeVariable(int* hash_key_idx,
     for (size_t j = 0; j < num_ops; ++j) {
       // replace following with specialized limit template in the future
       if (ops[i] == rmin) {
-	hash_results[j * len_hash_table + i] = 10000000000;
+	hash_results[j * len_hash_table + i] = cuda_custom::limits<Tval>::max();
       } else if (ops[i] == rmax) {
-        hash_results[j * len_hash_table + i] = -10000000000;
+        hash_results[j * len_hash_table + i] = cuda_custom::limits<Tval>::lowest();
       } else {
 	hash_results[j * len_hash_table + i] = 0;
       }

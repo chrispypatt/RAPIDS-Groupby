@@ -25,7 +25,7 @@ HashFunc.o: HashFunc.cu HashFunc.cuh
 groupby.o: groupby.cu 
 	$(NVCC) -c -o $@ groupby.cu $(NVCC_FLAGS)
 
-groupby_hash.o: groupby_hash.cu groupby_hash_templates.cu
+groupby_hash.o: groupby_hash.cu groupby_hash_templates.cu limits.cuh
 	$(NVCC) -c -o $@ groupby_hash.cu $(NVCC_FLAGS) $(CXX_FLAGS)
 
 cpuGroupby.o: cpuGroupby.cpp cpuGroupby.h

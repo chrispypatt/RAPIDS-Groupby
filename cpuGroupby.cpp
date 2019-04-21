@@ -12,6 +12,7 @@
 #include <numeric>
 #include <algorithm>
 #include <random>
+#include <limits>
 
 std::random_device rd;
 std::mt19937 gen(rd());
@@ -172,11 +173,11 @@ void cpuGroupby::doReductionOps() {
 }
 
 void cpuGroupby::rMax(int valIdx) {
-    int maximum = -999999999;
+  int maximum = std::numeric_limits<int>::lowest();
     int tempVal;
     
     for (int groupIdx=1; groupIdx<numGroups; groupIdx++) {
-        maximum = -999999999;
+        maximum = std::numeric_limits<int>::lowest();
         for (int subIdx=0; subIdx<groupPtr[groupIdx]-groupPtr[groupIdx-1]; subIdx++) {
             tempVal = value_columns[ valIdx*num_value_rows + groupPtr[groupIdx-1]+subIdx ];
             if (tempVal>maximum) {
@@ -188,7 +189,7 @@ void cpuGroupby::rMax(int valIdx) {
     }
     
     //Handeling the final group
-    maximum = -999999999;
+    maximum = std::numeric_limits<int>::lowest();
     for (int subIdx=groupPtr[numGroups-1]; subIdx<num_value_rows; subIdx++) {
         tempVal = value_columns[ valIdx*num_value_rows + subIdx ];
         if (tempVal>maximum) {
@@ -200,11 +201,11 @@ void cpuGroupby::rMax(int valIdx) {
 }
 
 void cpuGroupby::rMin(int valIdx) {
-    int minimum = 999999999;
+    int minimum = std::numeric_limits<int>::max();
     int tempVal;
     
     for (int groupIdx=1; groupIdx<numGroups; groupIdx++) {
-        minimum = 999999999;
+        minimum = std::numeric_limits<int>::max();
         for (int subIdx=0; subIdx<groupPtr[groupIdx]-groupPtr[groupIdx-1]; subIdx++) {
             tempVal = value_columns[ valIdx*num_value_rows + groupPtr[groupIdx-1]+subIdx ];
             if (tempVal<minimum) {
@@ -216,7 +217,7 @@ void cpuGroupby::rMin(int valIdx) {
     }
     
     //Handeling the final group
-    minimum = 999999999;
+    minimum = std::numeric_limits<int>::max();
     for (int subIdx=groupPtr[numGroups-1]; subIdx<num_value_rows; subIdx++) {
         tempVal = value_columns[ valIdx*num_value_rows + subIdx ];
         if (tempVal<minimum) {
