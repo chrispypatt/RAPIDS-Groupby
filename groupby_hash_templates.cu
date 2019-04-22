@@ -24,10 +24,14 @@ bool keyEqualRM(T* key_columns, size_t idx1, size_t idx2, size_t num_key_rows, s
   return true;
 }
 
-// placeholder
+// hashKey generating
 __host__ __device__
-size_t HashKey(size_t idx) {
-  return 0;
+size_t HashKey(size_t idx, T* key_columns, size_t num_key_rows, size_t num_key_columns) {
+  size_t hash_key = 0;
+  for (size_t i=0; i < num_key_columns; ++i) {
+    hash_key = (31 * hash_key) + key_columns[i*num_key_rows+idx];
+  }
+  return hash_key;
 }
 
 template <typename Tval> __device__
@@ -82,7 +86,8 @@ void fillTable(Tkey* key_columns,
   size_t offset = gridDim.x * blockDim.x;
   for (size_t i = idx; i < num_key_rows; i += offset) {
     // try inserting, assume there is enough space
-    size_t curPos = HashKey(i) % len_hash_table;
+    size_t curPos = HashKey(i, key_columns, num_key_rows, num_key_columns) % len_hash_table;
+
     unsigned int collisionCount = 0;
     bool isInserted = false;
     while (!isInserted) {
