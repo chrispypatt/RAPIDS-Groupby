@@ -24,10 +24,15 @@ bool keyEqualRM(T* key_columns, size_t idx1, size_t idx2, size_t num_key_rows, s
   return true;
 }
 
-// placeholder
+// hashKey generating
+template <typename T> __host__ __device__
 __host__ __device__
-size_t HashKey(size_t idx) {
-  return 0;
+size_t HashKey(size_t idx, T* key_columns, size_t num_key_rows, size_t num_key_columns) {
+  size_t hash_key = 0;
+  for (size_t i=0; i < num_key_columns; ++i) {
+    hash_key = (31 * hash_key) + key_columns[i*num_key_rows+idx];
+  }
+  return hash_key;
 }
 
 template <typename Tval> __device__
@@ -82,7 +87,8 @@ void fillTable(Tkey* key_columns,
   size_t offset = gridDim.x * blockDim.x;
   for (size_t i = idx; i < num_key_rows; i += offset) {
     // try inserting, assume there is enough space
-    size_t curPos = HashKey(i) % len_hash_table;
+    size_t curPos = HashKey(i, key_columns, num_key_rows, num_key_cols) % len_hash_table;
+
     unsigned int collisionCount = 0;
     bool isInserted = false;
     while (!isInserted) {
@@ -151,10 +157,14 @@ void copyUnique(
       int num_key_rows)
 {
   int idx = threadIdx.x + blockIdx.x * blockDim.x;
-  while (idx < num_output_rows){
+  while (idx < num_output_rows){//num_output_rows){
+    // printf("%d |    : %d : %d \n ",hash_key_idx_d[hashTable_idxs_d[idx]], key_columns_d[hash_key_idx_d[hashTable_idxs_d[idx]]+num_key_rows*0], key_columns_d[hash_key_idx_d[hashTable_idxs_d[idx]]+num_key_rows*1]);
+
     for (int i = 0; i < num_key_columns; i++){//each column of key matrix
+      // printf(" : %d",key_columns_d[hash_key_idx_d[hashTable_idxs_d[idx]]+num_key_rows*i]);
       output_key_columns_d[idx+num_output_rows*i] = key_columns_d[hash_key_idx_d[hashTable_idxs_d[idx]]+num_key_rows*i];//copy original key entry to output
     }
+    // printf("\n");
     idx += gridDim.x*blockDim.x;//increment idx by thread space
   }
 }
@@ -200,11 +210,11 @@ void copyValues(
   }
 }
 
-struct is_not_neg_1
+struct is_pos
 {
   __host__ __device__
   bool operator()(const int x)
   {
-    return x != -1;
+    return x >= 0;
   }
 };
