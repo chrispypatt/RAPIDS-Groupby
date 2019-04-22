@@ -33,7 +33,6 @@ size_t HashKey(size_t idx) {
 template <typename Tval> __device__
 void updateEntry(Tval* value_columns,
 		 size_t num_val_rows,
-		 reductionType* ops,
 		 size_t num_ops,
 		 size_t idx,
 		 size_t hashPos,
@@ -47,7 +46,7 @@ void updateEntry(Tval* value_columns,
   for (size_t i = 0; i < num_ops; ++i) {
     Tval value = value_columns[i * num_val_rows + idx];
     size_t val_idx = i * len_hash_table + hashPos;
-    switch(ops[i]) {
+    switch(ops_c[i]) {
     case rmin:
       atomicMin(&(hash_results[val_idx]), value);
       break;
@@ -77,7 +76,6 @@ void fillTable(Tkey* key_columns,
 	       int* hash_count,
 	       Tval* hash_results,
 	       size_t len_hash_table,
-	       reductionType* ops,
 	       size_t num_ops)
 {
   size_t idx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -106,7 +104,7 @@ void fillTable(Tkey* key_columns,
       }
       // now it is safe to update the entry
       isInserted = true;
-      updateEntry<Tval>(value_columns, num_val_rows, ops, num_ops, i, curPos, hash_results, &(hash_count[curPos]), len_hash_table);
+      updateEntry<Tval>(value_columns, num_val_rows, num_ops, i, curPos, hash_results, &(hash_count[curPos]), len_hash_table);
     }
     if (!isInserted) {
       // Do sth in the case of overflowing hash table
@@ -119,7 +117,6 @@ void initializeVariable(int* hash_key_idx,
 			int* hash_count,
 			Tval* hash_results,
 			size_t len_hash_table,
-			reductionType* ops,
 			size_t num_ops)
 {
   // each thread responsible for one entry (with thread coarsening)
@@ -130,9 +127,9 @@ void initializeVariable(int* hash_key_idx,
     hash_count[i] = 0;
     for (size_t j = 0; j < num_ops; ++j) {
       // replace following with specialized limit template in the future
-      if (ops[i] == rmin) {
+      if (ops_c[j] == rmin) {
 	hash_results[j * len_hash_table + i] = cuda_custom::limits<Tval>::max();
-      } else if (ops[i] == rmax) {
+      } else if (ops_c[j] == rmax) {
         hash_results[j * len_hash_table + i] = cuda_custom::limits<Tval>::lowest();
       } else {
 	hash_results[j * len_hash_table + i] = 0;
@@ -149,12 +146,12 @@ void copyUnique(
       Tval* key_columns_d, 
       Tval* output_key_columns_d, 
       int num_output_rows, 
-      int num_key_columns.
+      int num_key_columns,
       int num_key_rows)
 {
-  idx = threadIdx.x + blockIdx.x * blockDim.x;
+  int idx = threadIdx.x + blockIdx.x * blockDim.x;
   while (idx < num_output_rows){
-    for (int i = 0; i < num_key_columns, i++){//each column of key matrix
+    for (int i = 0; i < num_key_columns; i++){//each column of key matrix
       output_key_columns_d[idx+num_output_rows*i] = key_columns_d[hash_key_idx_d[hashTable_idxs_d[idx]]+num_key_rows*i];//copy original key entry to output
     }
     idx += gridDim.x*blockDim.x;//increment idx by thread space
@@ -169,18 +166,17 @@ void copyValues(
       Tval* value_columns_d, 
       Tval* output_value_columns_d, 
       int num_output_rows, 
-      int num_value_columns.
+      int num_value_columns,
       int num_value_rows,
-      reductionType* ops,
       size_t num_ops,
-      size_t len_hash_table,
+      size_t len_hash_table
     )
 {
-  idx = threadIdx.x + blockIdx.x * blockDim.x;
+  int idx = threadIdx.x + blockIdx.x * blockDim.x;
   while (idx < num_output_rows){
     for (size_t i = 0; i < num_ops; ++i) {
       size_t val_idx = i * len_hash_table + hashTable_idxs_d[idx];
-      switch(ops[i]) {
+      switch(ops_c[i]) {
       case rmin:
         output_value_columns_d[idx+num_output_rows*i] = hash_results_d[val_idx];//copy result to output
         break;
@@ -208,6 +204,6 @@ struct is_not_neg_1
   __host__ __device__
   bool operator()(const int x)
   {
-    return x != -1s;
+    return x != -1;
   }
 };

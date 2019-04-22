@@ -12,12 +12,17 @@ endif
 
 LD_FLAGS    = -lcudart -L/usr/local/cuda/lib64
 EXE	        = groupby
+EXE_HASH	= groupby_hash
 OBJ	        = main.o cpuGroupby.o groupby.o HashFunc.o 
+OBJ_HASH	= main_hash.o cpuGroupby.o groupby_hash.o 
 
 default: $(EXE)
 
 main.o: main.cu cpuGroupby.h groupby.cu
 	$(NVCC) -c -o $@ main.cu $(NVCC_FLAGS) $(CXX_FLAGS)
+
+main_hash.o: main_hash.cu cpuGroupby.h groupby_hash.cuh
+	$(NVCC) -c -o $@ main_hash.cu $(NVCC_FLAGS) $(CXX_FLAGS)
 
 HashFunc.o: HashFunc.cu HashFunc.cuh
 	$(NVCC) -c -o $@ HashFunc.cu $(NVCC_FLAGS)
@@ -25,7 +30,7 @@ HashFunc.o: HashFunc.cu HashFunc.cuh
 groupby.o: groupby.cu 
 	$(NVCC) -c -o $@ groupby.cu $(NVCC_FLAGS)
 
-groupby_hash.o: groupby_hash.cu groupby_hash_templates.cu limits.cuh
+groupby_hash.o: groupby_hash.cu groupby_hash_templates.cu limits.cuh groupby_hash.cuh
 	$(NVCC) -c -o $@ groupby_hash.cu $(NVCC_FLAGS) $(CXX_FLAGS)
 
 cpuGroupby.o: cpuGroupby.cpp cpuGroupby.h
@@ -34,5 +39,7 @@ cpuGroupby.o: cpuGroupby.cpp cpuGroupby.h
 $(EXE): $(OBJ)
 	$(NVCC) $(OBJ) -o $(EXE) $(LD_FLAGS) $(NVCC_FLAGS)
 
+$(EXE_HASH): $(OBJ_HASH)
+	$(NVCC) $(OBJ_HASH) -o $(EXE_HASH) $(LD_FLAGS) $(NVCC_FLAGS) $(CXX_FLAG)
 clean:
 	rm -rf *.o $(EXE)
