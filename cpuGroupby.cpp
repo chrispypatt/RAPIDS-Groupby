@@ -367,31 +367,31 @@ void cpuGroupby::printResults() {
 }
 
 void cpuGroupby::printGPUResults(int* GPU_output_keys, int* GPU_output_values){
-  std::cout << "Printing GPU Results..." << std::endl;
+    std::cout << "Printing GPU Results..." << std::endl;
     
     for (int cRow=0; cRow<numGroups; cRow++) {
         //print keys for a row
         for (int keyIdx=0; keyIdx<num_key_columns; keyIdx++) {
             if (keyIdx == 0) {
-	      std::cout << "{";
+                std::cout << "{";
             }
-	    std::cout << GPU_output_keys[numGroups*keyIdx + cRow];
+            std::cout << GPU_output_keys[numGroups*keyIdx + cRow];
             if(keyIdx != num_key_columns-1) {
-	      std::cout << ":";
+                std::cout << ":";
             } else {
-	      std::cout << "}:";
+                std::cout << "}:";
             }
         }
         // Print values for a row
         for (int valIdx=0; valIdx<num_value_columns; valIdx++) {
             if (valIdx == 0) {
-	      std::cout << "{";
+                std::cout << "{";
             }
-	    std::cout << GPU_output_values[numGroups*valIdx + cRow];
+                std::cout << GPU_output_values[numGroups*valIdx + cRow];
             if(valIdx != num_value_columns-1) {
-	      std::cout << ":";
+                std::cout << ":";
             } else {
-	      std::cout << "}";
+                std::cout << "}";
             }
         }
 	std::cout << std::endl;

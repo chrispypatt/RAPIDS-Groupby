@@ -150,10 +150,14 @@ void copyUnique(
       int num_key_rows)
 {
   int idx = threadIdx.x + blockIdx.x * blockDim.x;
-  while (idx < num_output_rows){
+  while (idx < num_output_rows){//num_output_rows){
+    // printf("%d |    : %d : %d \n ",hash_key_idx_d[hashTable_idxs_d[idx]], key_columns_d[hash_key_idx_d[hashTable_idxs_d[idx]]+num_key_rows*0], key_columns_d[hash_key_idx_d[hashTable_idxs_d[idx]]+num_key_rows*1]);
+
     for (int i = 0; i < num_key_columns; i++){//each column of key matrix
+      // printf(" : %d",key_columns_d[hash_key_idx_d[hashTable_idxs_d[idx]]+num_key_rows*i]);
       output_key_columns_d[idx+num_output_rows*i] = key_columns_d[hash_key_idx_d[hashTable_idxs_d[idx]]+num_key_rows*i];//copy original key entry to output
     }
+    // printf("\n");
     idx += gridDim.x*blockDim.x;//increment idx by thread space
   }
 }
@@ -199,11 +203,11 @@ void copyValues(
   }
 }
 
-struct is_not_neg_1
+struct is_pos
 {
   __host__ __device__
   bool operator()(const int x)
   {
-    return x != -1;
+    return x >= 0;
   }
 };

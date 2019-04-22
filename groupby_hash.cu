@@ -62,9 +62,10 @@ void groupby_hash_GPU(const int* key_columns_h, int num_key_columns, int num_key
 
   //copy hash idex of keys, removeing -1's which signify not used
 //   copy_if(policy, index seq start, index seq end, hash keys for comparison, result containing idx to non -1's, comparator)
-  auto newEnd = thrust::copy_if(thrust::device, hash_d_seq, hash_d_seq + HASH_TABLE_SIZE, hash_key_idx_d, hashTable_idxs_d, is_not_neg_1());
+  auto newEnd = thrust::copy_if(thrust::device, hash_d_seq, hash_d_seq + HASH_TABLE_SIZE, hash_key_idx_d, hashTable_idxs_d, is_pos());
   
   num_output_rows = newEnd - hashTable_idxs_d;
+  printf("%d output rows!\n", num_output_rows);
 
   int* output_key_columns_d = NULL;
   cudaMalloc(&output_key_columns_d, sizeof(int)*num_key_columns*num_output_rows);
