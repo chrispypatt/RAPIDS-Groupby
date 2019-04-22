@@ -50,9 +50,37 @@ void groupby_hash_GPU(const int* key_columns_h, int num_key_columns, int num_key
 					HASH_TABLE_SIZE, ops_d, num_ops);
   gpuErrchk(cudaDeviceSynchronize());
 
-  // shrink the hash table to output array
+ // shrink the hash table to output array
+  //Create array of idices for hash table
+  int * seq, hashTable_idxs;
+  cudaMalloc((void**)&seq, HASH_TABLE_SIZE*sizeof(int)); //for hash index sequence  
+  cudaMalloc((void**)&key_idxs, HASH_TABLE_SIZE*sizeof(int));  //for key indexs without -1   
+  thrust::device_ptr<int> hash_d_seq = thrust::device_pointer_cast(seq); //for hash index sequence 
+  thrust::device_ptr<int> hashTable_idxs_d = thrust::device_pointer_cast(hashTable_idxs); //for key indexs without -1 
+  thrust::sequence(thrust::device, hash_d_seq, hash_d_seq + HASH_TABLE_SIZE; //fill hash index seq
+
+
+  //copy hash idex of keys, removeing -1's which signify not used
+//   copy_if(policy, index seq start, index seq end, hash keys for comparison, result containing idx to non -1's, comparator)
+  int *new_end = thrust::copy_if(thrust::device, hash_d_seq, hash_d_seq + HASH_TABLE_SIZE, hash_key_idx_d, hashTable_idxs_d, is_not_neg_1());
+  
+  num_output_rows = newEnd - hashTable_idxs_d;
+
+  int* output_key_columns_d = NULL;
+  cudaMalloc(&output_key_columns_d, sizeof(int)*num_key_columns*num_output_rows);
+  copyUnique<int><<<50,BLOCKDIM>>>(hashTable_idxs_d, hash_key_idx_d,key_columns_d, output_key_columns_d, num_output_rows, num_key_columns, num_key_rows);
+
+  int* output_value_columns_d = NULL;
+  cudaMalloc(&output_value_columns_d, sizeof(int)*num_value_columns*num_output_rows);
+  copyValues<int><<<50,BLOCKDIM>>>(hashTable_idxs_d, hash_results_d,hash_count_d, value_columns_d, output_value_columns_d, num_output_rows, num_value_columns, num_value_rows, ops_d, num_ops, HASH_TABLE_SIZE);
+
+  gpuErrchk(cudaDeviceSynchronize());
 
   // copy back
+
+  gpuErrchk(cudaMemcpy(output_keys,output_key_columns_d,sizeof(int)*num_key_columns*num_output_rows,cudaMemcpyDeviceToHost)); 
+  gpuErrchk(cudaMemcpy(output_values,output_value_columns_d,sizeof(int)*num_value_columns*num_output_rows,cudaMemcpyDeviceToHost)); 
+
 
   // free elements
 
@@ -61,5 +89,8 @@ void groupby_hash_GPU(const int* key_columns_h, int num_key_columns, int num_key
   cudaFree(hash_key_idx_d);
   cudaFree(hash_count_d);
   cudaFree(hash_results_d);
+  cudaFree(output_key_columns_d);
+  cudaFree(output_value_columns_d);
+  cudaFree(key_idxs);
   
 }

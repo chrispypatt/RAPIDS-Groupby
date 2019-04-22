@@ -140,3 +140,74 @@ void initializeVariable(int* hash_key_idx,
     }
   }
 }
+
+
+template <typename Tval> __global__
+void copyUnique(
+      int *hashTable_idxs_d, //where key resides in hash vector
+      int *hash_key_idx_d, //where key resides in original key matrix 
+      Tval* key_columns_d, 
+      Tval* output_key_columns_d, 
+      int num_output_rows, 
+      int num_key_columns.
+      int num_key_rows)
+{
+  idx = threadIdx.x + blockIdx.x * blockDim.x;
+  while (idx < num_output_rows){
+    for (int i = 0; i < num_key_columns, i++){//each column of key matrix
+      output_key_columns_d[idx+num_output_rows*i] = key_columns_d[hash_key_idx_d[hashTable_idxs_d[idx]]+num_key_rows*i];//copy original key entry to output
+    }
+    idx += gridDim.x*blockDim.x;//increment idx by thread space
+  }
+}
+
+template <typename Tval> __global__
+void copyValues(
+      int *hashTable_idxs_d, 
+      Tval* hash_results_d,
+      int *hash_count_d,
+      Tval* value_columns_d, 
+      Tval* output_value_columns_d, 
+      int num_output_rows, 
+      int num_value_columns.
+      int num_value_rows,
+      reductionType* ops,
+      size_t num_ops,
+      size_t len_hash_table,
+    )
+{
+  idx = threadIdx.x + blockIdx.x * blockDim.x;
+  while (idx < num_output_rows){
+    for (size_t i = 0; i < num_ops; ++i) {
+      size_t val_idx = i * len_hash_table + hashTable_idxs_d[idx];
+      switch(ops[i]) {
+      case rmin:
+        output_value_columns_d[idx+num_output_rows*i] = hash_results_d[val_idx];//copy result to output
+        break;
+      case rmax:
+        output_value_columns_d[idx+num_output_rows*i] = hash_results_d[val_idx];//copy result to output
+      break;
+      case rcount:
+        output_value_columns_d[idx+num_output_rows*i] = hash_results_d[val_idx];//copy result to output
+      break;
+      case rmean: 
+        output_value_columns_d[idx+num_output_rows*i] = hash_results_d[val_idx]/hash_count_d[val_idx];//copy result to output
+        break;
+      case rsum:
+        output_value_columns_d[idx+num_output_rows*i] = hash_results_d[val_idx];//copy result to output
+        break;
+      }
+    }
+
+    idx += gridDim.x*blockDim.x;//increment idx by thread space
+  }
+}
+
+struct is_not_neg_1
+{
+  __host__ __device__
+  bool operator()(const int x)
+  {
+    return x != -1s;
+  }
+};
