@@ -42,4 +42,4 @@ $(EXE): $(OBJ)
 $(EXE_HASH): $(OBJ_HASH)
 	$(NVCC) $(OBJ_HASH) -o $(EXE_HASH) $(LD_FLAGS) $(NVCC_FLAGS) $(CXX_FLAG)
 clean:
-	rm -rf *.o $(EXE)
+	rm -rf *.o $(EXE) $(EXE_HASH)

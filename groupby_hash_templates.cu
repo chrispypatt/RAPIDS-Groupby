@@ -87,13 +87,14 @@ void fillTable(Tkey* key_columns,
     bool isInserted = false;
     while (!isInserted) {
       // first read the value out 
-      ssize_t old = hash_key_idx[curPos];
+      int old = hash_key_idx[curPos];
       // if it is -1, try update, else don't
       if (old == -1) 
 	old = atomicCAS(&(hash_key_idx[curPos]), -1, i);
-      // now old contains either i or a new address, if it is a new address meaning other thread claimed it
-      // note: old should not contain -1 now, safe to cast to size_t
-      if ((size_t)old != i) {
+      // now old contains either -1 or a new address, if it is a new address meaning other thread claimed it
+      
+      if (old != -1) {
+	// note: old should not contain -1 now, safe to cast to size_t
 	if (!keyEqualCM<Tkey>(key_columns, (size_t)old, i, num_key_rows, num_key_cols)) {
 	  // collision
 	  curPos = (curPos + 1) % len_hash_table; // linear probing
