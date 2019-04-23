@@ -198,7 +198,7 @@ void copyValues(
         output_value_columns_d[idx+num_output_rows*i] = hash_results_d[val_idx];//copy result to output
       break;
       case rmean: 
-        output_value_columns_d[idx+num_output_rows*i] = hash_results_d[val_idx]/hash_count_d[val_idx];//copy result to output
+        output_value_columns_d[idx+num_output_rows*i] = hash_results_d[val_idx]/hash_count_d[hashTable_idxs_d[idx]];//copy result to output
         break;
       case rsum:
         output_value_columns_d[idx+num_output_rows*i] = hash_results_d[val_idx];//copy result to output
