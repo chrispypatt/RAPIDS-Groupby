@@ -400,19 +400,50 @@ void cpuGroupby::printGPUResults(int* GPU_output_keys, int* GPU_output_values){
     std::cout << "End GPU Printing Results" << std::endl;
 }
 
-bool cpuGroupby::validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows) {
-    //ASSUMING THE GPU RESULT IS SORTED
+bool cpuGroupby::validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows, bool isSorted) {
     if (GPUOutputRows != numGroups) {
       std::cout << "FAILED - CPU Rows: " << numGroups << " GPU Rows: " << GPUOutputRows << std::endl;
         return false;
     }
+    
     // cout << "GPU:CPU"<<endl;
-    for (int i=0; i<num_value_columns*numGroups; i++) {
+    if (isSorted) {
+      for (int i=0; i<num_value_columns*numGroups; i++) {
         // cout << GPUValues[i] << ":" << output_values[i] << endl;
         if (GPUValues[i] != output_values[i]) {
 	  std::cout << "FAILED - CPU data != GPU data " << std::endl;
 	  return false;
         }
+      }
+    } else {
+      std::vector<size_t> idx(GPUOutputRows);
+      std::iota(idx.begin(), idx.end(), 0);
+      std::sort(idx.begin(), idx.end(),
+		[=] (const size_t idx1, const size_t idx2) {
+		  for (size_t i = 0; i < num_key_columns; ++i) {
+		    size_t data1 = GPUKeys[i * GPUOutputRows + idx1];
+		    size_t data2 = GPUKeys[i * GPUOutputRows + idx2];
+		    if (data1 > data2) return false;
+		    if (data1 < data2) return true;
+		  }
+		  return false;
+		});
+      for (size_t i = 0; i < GPUOutputRows; ++i) {
+	for (size_t j = 0; j < num_key_columns; ++j) {
+	  if (GPUKeys[j * GPUOutputRows + idx[i]] != output_keys[j * GPUOutputRows + i]) {
+	    std::cout << "FAILED - CPU key != GPU key at entry " << i << std::endl;
+	    return false;
+	  }
+	}
+      }
+      for (size_t i = 0; i < GPUOutputRows; ++i) {
+	for (size_t j = 0; j < num_value_columns; ++j) {
+	  if (GPUValues[j * GPUOutputRows + idx[i]] != output_values[j * GPUOutputRows + i]) {
+	    std::cout << "FAILED - CPU data != GPU data at entry " << i << std::endl;
+	    return false;
+	  }
+	}
+      }
     }
     std::cout << "PASSED - CPU data == GPU data " << std::endl;   
     return true;

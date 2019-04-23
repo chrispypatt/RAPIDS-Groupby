@@ -73,7 +73,7 @@ int main(int argc, const char * argv[]) {
   std::cout << "CPU time: " << cpu_duration.count() << " s" << std::endl;
   std::cout << "GPU time: " << gpu_duration.count() << " s" << std::endl;
 
-  slowGroupby.validGPUResult(gpu_output_keys, gpu_output_values, gpu_output_rows);
+  slowGroupby.validGPUResult(gpu_output_keys, gpu_output_values, gpu_output_rows, false);
 
   cudaFreeHost(original_value_columns);
   cudaFreeHost(original_key_columns);
