@@ -68,7 +68,7 @@ public:
     ~cpuGroupby();  // To do - make sure arrays are freed
     
     // GPU Validation
-    bool validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows);
+  bool validGPUResult(int* GPUKeys, int* GPUValues, int GPUOutputRows, bool isSorted=true);
 };
 
 #endif /* cpuGroupby_hpp */

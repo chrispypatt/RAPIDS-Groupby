@@ -26,7 +26,6 @@ bool keyEqualRM(T* key_columns, size_t idx1, size_t idx2, size_t num_key_rows, s
 
 // hashKey generating
 template <typename T> __host__ __device__
-__host__ __device__
 size_t HashKey(size_t idx, T* key_columns, size_t num_key_rows, size_t num_key_columns) {
   size_t hash_key = 0;
   for (size_t i=0; i < num_key_columns; ++i) {

@@ -1,6 +1,5 @@
 # Makefile for GPU GroupBy Project
 # EE-5351 Fall 2018
-dbg = 1
 NVCC        = nvcc
 NVCC_FLAGS  = -I/usr/local/cuda/include -gencode=arch=compute_60,code=\"sm_60\" --relocatable-device-code true
 CXX_FLAGS   = -std=c++11
