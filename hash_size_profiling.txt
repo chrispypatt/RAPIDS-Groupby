@@ -1,12 +1,13 @@
 CPU : 0.251699 s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 103
+	GPU : 0.016795 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 133
 	GPU : 0.0164055 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 1003
 	GPU : 0.0164877 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 10003
 	GPU : 0.0168231 s
-Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 100003
-	GPU : 0.016795 s
+
 
 CPU : 0.281081 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000, hash table rows 1003
@@ -19,8 +20,6 @@ Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000, hash table
 	GPU : 0.0164798 s
 
 CPU : 0.402252 s
-Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash table rows 1003
-	GPU :  NA
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash table rows 10003
 	GPU : 0.068726 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash table rows 13333
@@ -31,10 +30,6 @@ Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash tabl
 	GPU : 0.0194097 s
 
 CPU : 1.58248 s
-Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 1003
-	GPU : NA 
-Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 10003
-	GPU : NA
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 100003
 	GPU : 0.401156 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 133333
@@ -43,3 +38,13 @@ Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash tab
 	GPU : 0.0230148 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 10000003
 	GPU : 0.0336232 s
+
+CPU :  s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000000, hash table rows 1000003
+	GPU :  s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000000, hash table rows 1333333
+	GPU :  s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000000, hash table rows 10000003
+	GPU :  s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000000, hash table rows 100000003
+	GPU :  s
