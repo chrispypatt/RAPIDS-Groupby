@@ -14,12 +14,12 @@ __constant__ reductionType ops_c[512];
 #include "groupby_hash_templates.cu"
 
 
-void groupby_hash_GPU(const int* key_columns_h, int num_key_columns, int num_key_rows,
+void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key_columns, int num_key_rows,
 		      const int* value_columns_h, int num_value_columns, int num_value_rows,
 		      reductionType* ops, int num_ops, int* output_keys, int* output_values, int &num_output_rows)
 {
   constexpr unsigned int BLOCKDIM = 1024;
-  constexpr unsigned int HASH_TABLE_SIZE = 1003;
+  unsigned int HASH_TABLE_SIZE = hash_size;
   constexpr unsigned int GRIDDIM = 40; // 40 as GTX 1080 only have 20 SMs and it can schedule 2048 threads
                                        // change to 56*2 = 112 if testing on Tesla P100
   

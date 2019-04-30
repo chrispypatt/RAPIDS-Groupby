@@ -11,7 +11,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 } 
 
-void groupby_hash_GPU(const int* key_columns_h, int num_key_columns, int num_key_rows,
+void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key_columns, int num_key_rows,
 		      const int* value_columns_h, int num_value_columns, int num_value_rows,
 		      reductionType* ops, int num_ops, int* output_keys, int* output_values, int &num_output_rows);
 

@@ -10,19 +10,19 @@ To build the program, type 'make' in the root folder of the files.
 Command line usage for sorting based GroupBy:
 ```
 make
-./groupby                                                           # Data Entries:  100k, key_columns: 2, row_columns: 3, unique keys per column: 4
-./groupby <num_rows>                                                # Data Entries: num_rows, key_columns: 2, row_columns: 3, unique keys per column: 4
-./groupby <num_rows> <key_cols> <val_cols>                          # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys per column: 4
+./groupby                                                           # Data Entries:  100k, key_columns: 2, row_columns: 3, unique keys: 4
+./groupby <num_rows>                                                # Data Entries: num_rows, key_columns: 2, row_columns: 3, unique keys: 4
+./groupby <num_rows> <key_cols> <val_cols>                          # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys: 4
 ./groupby <num_rows> <key_cols> <val_cols> <distinct_keys>  # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys : distinct_keys
 ```
 Notice: If the number of distinct keys in each column is m, n key_columns will generate m^n distinct keys.
 Command line usage for hashed based GroupBy:
 ```
 make groupby_hash
-./groupby_hash                                                           # Data Entries:  100k, key_columns: 2, row_columns: 3, unique keys per column: 4
-./groupby_hash <num_rows>                                                # Data Entries: num_rows, key_columns: 2, row_columns: 3, unique keys per column: 4
-./groupby_hash <num_rows> <key_cols> <val_cols>                          # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys per column: 4
-./groupby_hash <num_rows> <key_cols> <val_cols> <distinct_keys>  # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys : distinct_keys
+./groupby_hash                                                           # Data Entries:  100k, key_columns: 2, row_columns: 3, unique keys: 4
+./groupby_hash <num_rows>                                                # Data Entries: num_rows, key_columns: 2, row_columns: 3, unique keys: 4
+./groupby_hash <num_rows> <key_cols> <val_cols>                          # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys: 4
+./groupby_hash <num_rows> <key_cols> <val_cols> <distinct_keys> <hash_table_size> # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys : distinct_keys, hashtable rows: hash_table_size
 ```
 
 The program will populate random data, compute on CPU and GPU then validate the results.

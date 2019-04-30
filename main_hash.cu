@@ -14,6 +14,7 @@ int main(int argc, const char * argv[]) {
   int num_key_cols = 2;
   int num_val_cols = 3;
   int num_distinct_keys = 10;
+  int hash_table_rows = 1003;
   std::vector<std::string> args(argv, argv+argc);
   if (argc == 2){
     num_rows = stoi(args.at(1));
@@ -26,6 +27,12 @@ int main(int argc, const char * argv[]) {
     num_key_cols = stoi(args.at(2));
     num_val_cols = stoi(args.at(3));
     num_distinct_keys = stoi(args.at(4));
+  }else if(argc == 6){
+    num_rows = stoi(args.at(1));
+    num_key_cols = stoi(args.at(2));
+    num_val_cols = stoi(args.at(3));
+    num_distinct_keys = stoi(args.at(4));
+    hash_table_rows = stoi(args.at(5));
   } else {
     if (argc != 1) {
       std::cerr << "Invalid arguments" << std::endl;
@@ -59,7 +66,7 @@ int main(int argc, const char * argv[]) {
 
   start = Time::now();
 
-  groupby_hash_GPU(original_key_columns, slowGroupby.num_key_columns,
+  groupby_hash_GPU(hash_table_rows,original_key_columns, slowGroupby.num_key_columns,
 		   slowGroupby.num_key_rows, original_value_columns, 
 		   slowGroupby.num_value_columns, slowGroupby.num_value_rows, 
 		   slowGroupby.ops, slowGroupby.num_ops,
