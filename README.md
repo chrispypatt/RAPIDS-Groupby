@@ -19,9 +19,10 @@ Notice: If the number of distinct keys in each column is m, n key_columns will g
 Command line usage for hashed based GroupBy:
 ```
 make groupby_hash
-./groupby_hash                                                           # Data Entries:  100k, key_columns: 2, row_columns: 3, unique keys: 4
-./groupby_hash <num_rows>                                                # Data Entries: num_rows, key_columns: 2, row_columns: 3, unique keys: 4
-./groupby_hash <num_rows> <key_cols> <val_cols>                          # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys: 4
+./groupby_hash                                                           # Data Entries:  100k, key_columns: 2, row_columns: 3, unique keys: 4, hashtable rows: 1003
+./groupby_hash <num_rows>                                                # Data Entries: num_rows, key_columns: 2, row_columns: 3, unique keys: 4, hashtable rows: 1003
+./groupby_hash <num_rows> <key_cols> <val_cols>                          # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys: 4, hashtable rows: 1003
+./groupby_hash <num_rows> <key_cols> <val_cols> <distinct_keys> # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys : distinct_keys, hashtable rows: 1003
 ./groupby_hash <num_rows> <key_cols> <val_cols> <distinct_keys> <hash_table_size> # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys : distinct_keys, hashtable rows: hash_table_size
 ```
 
