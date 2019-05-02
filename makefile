@@ -5,15 +5,28 @@ NVCC_FLAGS  = -I/usr/local/cuda/include -gencode=arch=compute_60,code=\"sm_60\" 
 CXX_FLAGS   = -std=c++11
 ifdef dbg
 	NVCC_FLAGS  += -g -G
+	CXX_FLAGS += -DDEBUG
 else
 	NVCC_FLAGS  += -O3
+endif
+
+ifdef NOPRINT
+	CXX_FLAGS += -DNOPRINT
+endif
+
+ifdef PRIV
+	CXX_FLAGS += -DPRIVATIZATION
+endif
+
+ifdef TESLA
+	CXX_FLAGS += -DTESLA
 endif
 
 LD_FLAGS    = -lcudart -L/usr/local/cuda/lib64
 EXE	        = groupby
 EXE_HASH	= groupby_hash
 OBJ	        = main.o cpuGroupby.o groupby.o HashFunc.o 
-OBJ_HASH	= main_hash.o cpuGroupby.o groupby_hash.o 
+OBJ_HASH	= main_hash.o cpuGroupby.o groupby_hash.o
 
 default: $(EXE)
 

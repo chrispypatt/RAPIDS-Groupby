@@ -42,10 +42,11 @@ void updateEntry(Tval* value_columns,
 		 size_t hashPos,
 		 Tval* hash_results,
 		 int* countPtr,
-		 size_t len_hash_table)
+		 size_t len_hash_table,
+		 int count=1)
 {
   // update count
-  atomicAdd(countPtr, 1);
+  atomicAdd(countPtr, count);
   // update each item
   for (size_t i = 0; i < num_ops; ++i) {
     Tval value = value_columns[i * num_val_rows + idx];
@@ -58,7 +59,7 @@ void updateEntry(Tval* value_columns,
       atomicMax(&(hash_results[val_idx]), value);
       break;
     case rcount:
-      atomicAdd(&(hash_results[val_idx]), 1);
+      atomicAdd(&(hash_results[val_idx]), count);
       break;
     case rmean: // fall-thru
     case rsum:
@@ -67,7 +68,6 @@ void updateEntry(Tval* value_columns,
     }
   }
 }
-
 
 template <typename Tkey, typename Tval> __global__
 void fillTable(Tkey* key_columns,
@@ -116,6 +116,148 @@ void fillTable(Tkey* key_columns,
       // Do sth in the case of overflowing hash table
     }
   }
+}
+
+template <typename Tkey, typename Tval> __global__
+void fillTable_privatization(Tkey* key_columns,
+			     size_t num_key_rows,
+			     size_t num_key_cols,
+			     Tval* value_columns,
+			     size_t num_val_rows,
+			     size_t num_val_cols,
+			     int* hash_key_idx,
+			     int* hash_count,
+			     Tval* hash_results,
+			     size_t len_hash_table,
+			     size_t len_shared_hash_table,
+			     size_t num_ops)
+{
+  size_t idx = threadIdx.x + blockIdx.x * blockDim.x;
+  size_t offset = gridDim.x * blockDim.x;
+  __shared__ unsigned int filled_hash_table_shared;
+  extern __shared__ char hash_table_shared[];
+
+  int* s_hash_key_idx = (int*)hash_table_shared;
+  int* s_hash_count = (int*)&(hash_table_shared[len_shared_hash_table*sizeof(int)]);
+  size_t s_offset = (2*len_shared_hash_table*sizeof(int) + sizeof(Tval) - 1) / sizeof(Tval);
+  
+  Tval* s_hash_results = (Tval*)&(hash_table_shared[s_offset*sizeof(Tval)]);
+  
+  // initialization
+  for (size_t i = threadIdx.x; i < len_shared_hash_table; i += blockDim.x) {
+    s_hash_key_idx[i] = -1;
+    s_hash_count[i] = 0;
+    for (size_t j = 0; j < num_ops; ++j) {
+      // replace following with specialized limit template in the future
+      if (ops_c[j] == rmin) {
+	s_hash_results[j * len_shared_hash_table + i] = cuda_custom::limits<Tval>::max();
+      } else if (ops_c[j] == rmax) {
+        s_hash_results[j * len_shared_hash_table + i] = cuda_custom::limits<Tval>::lowest();
+      } else {
+	s_hash_results[j * len_shared_hash_table + i] = 0;
+      }
+    }
+  }
+  if (threadIdx.x == 0) filled_hash_table_shared = 0;
+  __syncthreads();
+  
+  for (size_t i = idx; i < num_key_rows; i += offset) {
+    // try inserting, assume there is enough space
+    size_t curPos = HashKey(i, key_columns, num_key_rows, num_key_cols) % len_shared_hash_table;
+    unsigned int collisionCount = 0;
+    bool isInserted = false;
+    while (!isInserted) {
+      // quit if shared hash table is 80% full
+      if (filled_hash_table_shared >= ( 8 * len_shared_hash_table / 10)) break;
+      int old = s_hash_key_idx[curPos];
+      // if it is -1, try update, else don't
+      if (old == -1) 
+	old = atomicCAS(&(s_hash_key_idx[curPos]), -1, i);
+      // now old contains either -1 or a new address, if it is a new address meaning other thread claimed it
+      
+      if (old != -1) {
+	// note: old should not contain -1 now, safe to cast to size_t
+	if (!keyEqualCM<Tkey>(key_columns, (size_t)old, i, num_key_rows, num_key_cols)) {
+	  // collision
+	  curPos = (curPos + 1) % len_shared_hash_table; // linear probing
+	  if (++collisionCount == len_shared_hash_table)
+	    break; // break the loop if it looped over the hash table and still failed
+	  continue;
+	}
+      } else {
+	atomicAdd(&filled_hash_table_shared, 1);
+      }
+      // now it is safe to update the entry
+      isInserted = true;
+      updateEntry<Tval>(value_columns, num_val_rows, num_ops, i, curPos, s_hash_results, &(s_hash_count[curPos]), len_shared_hash_table);
+    }
+    // if current column not inserted, insert to global one
+    curPos = HashKey(i, key_columns, num_key_rows, num_key_cols) % len_hash_table;
+    collisionCount = 0;
+    while (!isInserted) {
+      // first read the value out
+
+      int old = hash_key_idx[curPos];
+      // if it is -1, try update, else don't
+      if (old == -1) 
+	old = atomicCAS(&(hash_key_idx[curPos]), -1, i);
+      // now old contains either -1 or a new address, if it is a new address meaning other thread claimed it
+      
+      if (old != -1) {
+	// note: old should not contain -1 now, safe to cast to size_t
+	if (!keyEqualCM<Tkey>(key_columns, (size_t)old, i, num_key_rows, num_key_cols)) {
+	  // collision
+	  curPos = (curPos + 1) % len_hash_table; // linear probing
+	  if (++collisionCount == len_hash_table)
+	    break; // break the loop if it looped over the hash table and still failed
+	  continue;
+	}
+      }
+      // now it is safe to update the entry
+      isInserted = true;
+      updateEntry<Tval>(value_columns, num_val_rows, num_ops, i, curPos, hash_results, &(hash_count[curPos]), len_hash_table);
+
+    }
+    if (!isInserted) {
+      // Do sth in the case of overflowing hash table
+    }
+  }
+  __syncthreads();
+  for (size_t i = threadIdx.x; i < len_shared_hash_table; i += blockDim.x) {
+    int real_idx = s_hash_key_idx[i];
+    if (real_idx != -1) {
+      size_t curPos = HashKey(real_idx, key_columns, num_key_rows, num_key_cols) % len_hash_table;
+      int collisionCount = 0;
+      bool isInserted = false;
+      while (!isInserted) {
+	// first read the value out
+	int old = hash_key_idx[curPos];
+	// if it is -1, try update, else don't
+	if (old == -1) 
+	  old = atomicCAS(&(hash_key_idx[curPos]), -1, real_idx);
+	// now old contains either -1 or a new address, if it is a new address meaning other thread claimed it
+	
+	if (old != -1) {
+	  // note: old should not contain -1 now, safe to cast to size_t
+	  if (!keyEqualCM<Tkey>(key_columns, (size_t)old, real_idx, num_key_rows, num_key_cols)) {
+	    // collision
+	    curPos = (curPos + 1) % len_hash_table; // linear probing
+	    if (++collisionCount == len_hash_table)
+	      break; // break the loop if it looped over the hash table and still failed
+	    continue;
+	  }
+	}
+	// now it is safe to update the entry
+	isInserted = true;
+	updateEntry<Tval>(s_hash_results, len_shared_hash_table, num_ops,
+			  i, curPos, hash_results, &(hash_count[curPos]), len_hash_table, s_hash_count[i]);
+	
+      }
+      if (!isInserted) {
+	// Do sth in the case of overflowing hash table
+      }
+    }
+  } 
 }
 
 template <typename Tval> __global__

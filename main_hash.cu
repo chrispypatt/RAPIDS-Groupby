@@ -72,9 +72,9 @@ int main(int argc, const char * argv[]) {
 		   slowGroupby.ops, slowGroupby.num_ops,
 		   gpu_output_keys, gpu_output_values, gpu_output_rows);
   end = Time::now();
-        
+#ifndef NOPRINT        
   slowGroupby.printGPUResults(gpu_output_keys, gpu_output_values);
-
+#endif
   fsec gpu_duration = end - start;
 
   std::cout << "CPU time: " << cpu_duration.count() << " s" << std::endl;
