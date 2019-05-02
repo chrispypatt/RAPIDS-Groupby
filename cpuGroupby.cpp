@@ -144,7 +144,9 @@ void cpuGroupby::groupby() {
     getGroupPtr();
     writeOutputKeys();
     doReductionOps();
+#ifndef NOPRINT
     printResults();
+#endif
 }
 
 void cpuGroupby::doReductionOps() {

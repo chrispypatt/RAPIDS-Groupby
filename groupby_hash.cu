@@ -13,15 +13,28 @@ __constant__ reductionType ops_c[512];
 
 #include "groupby_hash_templates.cu"
 
+size_t size_alignment(size_t size, size_t alignment)
+{
+  return (size + alignment - 1) / alignment;
+}
 
 void groupby_hash_GPU(const int* key_columns_h, int num_key_columns, int num_key_rows,
 		      const int* value_columns_h, int num_value_columns, int num_value_rows,
 		      reductionType* ops, int num_ops, int* output_keys, int* output_values, int &num_output_rows)
 {
+#ifdef DEBUG
+  constexpr unsigned int BLOCKDIM = 512;
+#else
   constexpr unsigned int BLOCKDIM = 1024;
-  constexpr unsigned int HASH_TABLE_SIZE = 1003;
-  constexpr unsigned int GRIDDIM = 40; // 40 as GTX 1080 only have 20 SMs and it can schedule 2048 threads
-                                       // change to 56*2 = 112 if testing on Tesla P100
+#endif
+  constexpr unsigned int HASH_TABLE_SIZE = 10003;
+#ifndef TESLA
+  constexpr unsigned int GRIDDIM = 40; 
+#else
+  constexpr unsigned int GRIDDIM = 112; 
+#endif
+  
+  using Tval = int; // replace int with actual variable type if needed;
   
   // variableAllocating
   int* key_columns_d = NULL;
@@ -34,7 +47,7 @@ void groupby_hash_GPU(const int* key_columns_h, int num_key_columns, int num_key
   gpuErrchk(cudaMalloc(&value_columns_d, sizeof(int)*num_value_columns*num_value_rows));
   gpuErrchk(cudaMalloc(&hash_key_idx_d, sizeof(int)*HASH_TABLE_SIZE));
   gpuErrchk(cudaMalloc(&hash_count_d, sizeof(int)*HASH_TABLE_SIZE));
-  gpuErrchk(cudaMalloc(&hash_results_d, sizeof(int)*HASH_TABLE_SIZE*num_ops));
+  gpuErrchk(cudaMalloc(&hash_results_d, sizeof(Tval)*HASH_TABLE_SIZE*num_ops));
   
   // initialize values
   gpuErrchk(cudaMemcpy(key_columns_d, key_columns_h, sizeof(int)*num_key_columns*num_key_rows, cudaMemcpyHostToDevice));
@@ -44,10 +57,40 @@ void groupby_hash_GPU(const int* key_columns_h, int num_key_columns, int num_key
   gpuErrchk(cudaDeviceSynchronize());
 
   // fill hash table
+#ifndef PRIVATIZATION
   fillTable<int, int><<<GRIDDIM, BLOCKDIM>>>(key_columns_d, num_key_rows, num_key_columns,
 					     value_columns_d, num_value_rows, num_value_columns,
 					     hash_key_idx_d, hash_count_d, hash_results_d,
 					     HASH_TABLE_SIZE, num_ops);
+#else
+  cudaDeviceProp deviceProp;
+  cudaGetDeviceProperties(&deviceProp, 0);
+  size_t sharedMemPerBlock = deviceProp.sharedMemPerBlock;
+  printf("Total amount of sharedmemory per block %u\n", sharedMemPerBlock);
+# ifdef TESLA
+  sharedMemPerBlock = 32 * 1024;
+# endif
+  size_t max_capacity = sharedMemPerBlock - sizeof(unsigned int);
+  size_t s_len_table = max_capacity / (2*sizeof(int) + sizeof(Tval)*num_ops);
+  size_t sharedMemorySize = 0;
+  while (true) { // calculate the suitable length of shared memory table
+    sharedMemorySize = size_alignment(2*sizeof(int)*s_len_table, sizeof(Tval)) * sizeof(int);
+    sharedMemorySize += sizeof(Tval)*num_ops*s_len_table;
+    if (sharedMemorySize < max_capacity)
+      if (s_len_table % 2 == 1) break; // always make length an odd number to avoid serious collision
+    --s_len_table;
+  }
+  printf("Length of Shared Table: %u\n", s_len_table);
+  printf("Total extern shared memory: %u\n", sharedMemorySize);
+  fillTable_privatization
+    <int, int><<<GRIDDIM, BLOCKDIM, sharedMemorySize>>>(key_columns_d, num_key_rows,
+							num_key_columns, value_columns_d,
+							num_value_rows, num_value_columns,
+							hash_key_idx_d, hash_count_d,
+							hash_results_d, HASH_TABLE_SIZE,
+							s_len_table, num_ops);
+#endif
+  gpuErrchk(cudaPeekAtLastError());
   gpuErrchk(cudaDeviceSynchronize());
 
   //shrink the hash table to output array
