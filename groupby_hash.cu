@@ -70,7 +70,7 @@ void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key
 # ifdef TESLA
   sharedMemPerBlock = 32 * 1024;
 # endif
-  size_t max_capacity = sharedMemPerBlock - sizeof(unsigned int);
+  size_t max_capacity = sharedMemPerBlock - 48; // for some reason 48 is required for reserved variable
   size_t s_len_table = max_capacity / (2*sizeof(int) + sizeof(Tval)*num_ops);
   size_t sharedMemorySize = 0;
   while (true) { // calculate the suitable length of shared memory table
