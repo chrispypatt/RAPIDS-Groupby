@@ -1,9 +1,14 @@
 CPU : 0.251699 s
 GPU SORT : 0.0346442 s
+GPU 1.3x Hash Privatization: 0.0161954 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 103
 	GPU : 0.016795 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 133
 	GPU : 0.0164055 s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 203
+	GPU : 0.0160038 s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 403
+	GPU : 0.0165023 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 1003
 	GPU : 0.0164877 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table rows 10003
@@ -12,10 +17,15 @@ Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100, hash table 
 
 CPU : 0.281081 s
 GPU SORT : 0.0376946 s
+GPU 1.3x Hash Privatization: 0.0166766 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000, hash table rows 1003
 	GPU : 0.0340608 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000, hash table rows 1333
 	GPU : 0.0169413 s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000, hash table rows 2003
+	GPU : 0.0162486 s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000, hash table rows 4003
+	GPU : 0.0163454 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000, hash table rows 10003
 	GPU : 0.016829 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000, hash table rows 100003
@@ -23,10 +33,15 @@ Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 1000, hash table
 
 CPU : 0.402252 s
 GPU SORT : 0.0377506 s
+GPU 1.3x Hash Privatization: 0.0180648 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash table rows 10003
 	GPU : 0.068726 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash table rows 13333
 	GPU : 0.0172377 s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash table rows 20003
+	GPU : 0.0160524 s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash table rows 40003
+	GPU : 0.0156048 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash table rows 100003
 	GPU : 0.0167698 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash table rows 1000003
@@ -34,10 +49,15 @@ Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 10000, hash tabl
 
 CPU : 1.58248 s
 GPU SORT : 0.0414775 s
+GPU 1.3x Hash Privatization: 0.020789 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 100003
 	GPU : 0.401156 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 133333
 	GPU : 0.0201403 s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 200003
+	GPU : 0.0194745 s
+Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 400003
+	GPU : 0.021631 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 1000003
 	GPU : 0.0230148 s
 Data Entries:  1M, key_columns: 2, row_columns: 3, unique keys: 100000, hash table rows 10000003
