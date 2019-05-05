@@ -8,6 +8,7 @@
 #include <cmath>
 #include <curand.h>
 #include <curand_kernel.h>
+#include <cassert>
 
 #include "cpuGroupby.h"
 #include "groupby_hash.cuh"
@@ -68,6 +69,7 @@ void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key
 							     num_key_rows,
 							     num_key_columns);
   std::cout << "Predicted Hash Table Length:" << predictedLength << std::endl;
+  HASH_TABLE_SIZE = predictedLength;
 #elif defined(GPU_SAMPLE)
   unsigned int* count = NULL;
   curandState* state = NULL;
@@ -87,9 +89,18 @@ void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key
   gpuErrchk(cudaDeviceSynchronize());
 
   unsigned int countTotal = count[0] + count[1] + count[2];
-  float delta = std::sqrt((float)countTotal*((float)countTotal*9 - (float)count[1]*12));
-  unsigned int predictedLength = 2.6 * ((3*countTotal + delta) / (2*count[1]));
+  unsigned int predictedLength;
+  if (count[1]) {
+    float delta = std::sqrt((float)countTotal*((float)countTotal*9 - (float)count[1]*12));
+    predictedLength = 2.6 * ((3*countTotal + delta) / (2*count[1]));
+  } else {
+    std::cout << "Cannot predict number of keys (too big?)" << std::endl
+	      << "Using about 1% of original rows as start" << std::endl;;
+    predictedLength = num_key_rows / 81;
+    if (predictedLength % 2 == 0) ++ predictedLength;
+  }
   std::cout << "Predicted Hash Table Length:" << predictedLength << std::endl;
+  HASH_TABLE_SIZE = predictedLength;
 #endif
   
 
@@ -104,8 +115,6 @@ void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key
     gpuErrchk(cudaMalloc(&hash_count_d, sizeof(int)*HASH_TABLE_SIZE*hashsize_mutiplier));
     gpuErrchk(cudaMalloc(&hash_results_d, sizeof(int)*HASH_TABLE_SIZE*num_ops*hashsize_mutiplier)); 
   
-    gpuErrchk(cudaMemcpy(key_columns_d, key_columns_h, sizeof(int)*num_key_columns*num_key_rows, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(value_columns_d, value_columns_h, sizeof(int)*num_value_columns*num_value_rows, cudaMemcpyHostToDevice));
     initializeVariable<int><<<GRIDDIM, BLOCKDIM>>>(hash_key_idx_d, hash_count_d, hash_results_d, HASH_TABLE_SIZE*hashsize_mutiplier, num_ops);
     gpuErrchk(cudaDeviceSynchronize());
 
@@ -191,8 +200,6 @@ void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key
   gpuErrchk(cudaMalloc(&output_value_columns_d, sizeof(int)*num_value_columns*num_output_rows));
   copyValues<int><<<GRIDDIM,BLOCKDIM>>>(hashTable_idxs, hash_results_d,hash_count_d, value_columns_d, output_value_columns_d, num_output_rows, num_value_columns, num_value_rows, num_ops, hash_table_size_fixed);
 
-  printf("%d,%d\n",BLOCKDIM,GRIDDIM);
-  printf("waiting for Sync\n");
 
   gpuErrchk(cudaDeviceSynchronize());
 
