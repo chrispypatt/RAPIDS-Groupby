@@ -3,6 +3,11 @@
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 #include <thrust/device_ptr.h>
+#include <random>
+#include <iostream>
+#include <cmath>
+#include <curand.h>
+#include <curand_kernel.h>
 
 #include "cpuGroupby.h"
 #include "groupby_hash.cuh"
@@ -45,14 +50,48 @@ void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key
 
   gpuErrchk(cudaMalloc(&key_columns_d, sizeof(int)*num_key_columns*num_key_rows));
   gpuErrchk(cudaMalloc(&value_columns_d, sizeof(int)*num_value_columns*num_value_rows));
-  gpuErrchk(cudaMalloc(&hash_key_idx_d, sizeof(int)*HASH_TABLE_SIZE));
-  gpuErrchk(cudaMalloc(&hash_count_d, sizeof(int)*HASH_TABLE_SIZE));
-  gpuErrchk(cudaMalloc(&hash_results_d, sizeof(Tval)*HASH_TABLE_SIZE*num_ops));
   
-  // initialize values
+  // copy to target
   gpuErrchk(cudaMemcpy(key_columns_d, key_columns_h, sizeof(int)*num_key_columns*num_key_rows, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(value_columns_d, value_columns_h, sizeof(int)*num_value_columns*num_value_rows, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(ops_c, ops, sizeof(reductionType) * num_ops));
+
+  // sample hash table length
+#ifdef CPU_SAMPLE
+  unsigned int predictedLength = predictTableLength_CPU<int>(key_columns_h,
+							     num_key_rows,
+							     num_key_columns);
+  std::cout << "Predicted Hash Table Length:" << predictedLength << std::endl;
+#elif defined(GPU_SAMPLE)
+  unsigned int* count = NULL;
+  curandState* state = NULL;
+  gpuErrchk(cudaMallocManaged(&count, sizeof(unsigned int)*3));
+  gpuErrchk(cudaMalloc(&state, 1*BLOCKDIM*sizeof(curandState)));
+  unsigned int iterations = num_key_rows / BLOCKDIM / 100 + 1;
+  fillCURANDState<<<1, BLOCKDIM>>>(state, gen());
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+  predictTableLength_GPU<int><<<1, BLOCKDIM>>>(key_columns_d,
+					       num_key_rows,
+					       num_key_columns,
+					       iterations,
+					       count,
+					       state);
+  gpuErrchk(cudaPeekAtLastError());
+  gpuErrchk(cudaDeviceSynchronize());
+
+  unsigned int countTotal = count[0] + count[1] + count[2];
+  float delta = std::sqrt((float)countTotal*((float)countTotal*9 - (float)count[1]*12));
+  unsigned int predictedLength = 2.6 * ((3*countTotal + delta) / (2*count[1]));
+  std::cout << "Predicted Hash Table Length:" << predictedLength << std::endl;
+#endif
+  
+  
+  // Allocate hash table
+  gpuErrchk(cudaMalloc(&hash_key_idx_d, sizeof(int)*HASH_TABLE_SIZE));
+  gpuErrchk(cudaMalloc(&hash_count_d, sizeof(int)*HASH_TABLE_SIZE));
+  gpuErrchk(cudaMalloc(&hash_results_d, sizeof(Tval)*HASH_TABLE_SIZE*num_ops));
+
   initializeVariable<int><<<GRIDDIM, BLOCKDIM>>>(hash_key_idx_d, hash_count_d, hash_results_d, HASH_TABLE_SIZE, num_ops);
   gpuErrchk(cudaDeviceSynchronize());
 

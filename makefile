@@ -22,6 +22,14 @@ ifdef TESLA
 	CXX_FLAGS += -DTESLA
 endif
 
+ifdef GPU_SAMPLE
+	CXX_FLAGS += -DGPU_SAMPLE
+endif
+
+ifdef CPU_SAMPLE
+	CXX_FLAGS += -DCPU_SAMPLE
+endif
+
 LD_FLAGS    = -lcudart -L/usr/local/cuda/lib64
 EXE	        = groupby
 EXE_HASH	= groupby_hash
