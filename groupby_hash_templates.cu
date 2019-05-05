@@ -4,7 +4,7 @@
 
 // assume column major here
 template <typename T> __host__ __device__
-bool keyEqualCM(T* key_columns, size_t idx1, size_t idx2, size_t num_key_rows, size_t num_key_columns)
+bool keyEqualCM(const T* key_columns, size_t idx1, size_t idx2, size_t num_key_rows, size_t num_key_columns)
 {
   for (size_t i=0; i < num_key_columns; ++i) {
     if (key_columns[i*num_key_rows+idx1] != key_columns[i*num_key_rows+idx2])
@@ -15,7 +15,7 @@ bool keyEqualCM(T* key_columns, size_t idx1, size_t idx2, size_t num_key_rows, s
 
 // assume row major here
 template <typename T> __host__ __device__
-bool keyEqualRM(T* key_columns, size_t idx1, size_t idx2, size_t num_key_rows, size_t num_key_columns)
+bool keyEqualRM(const T* key_columns, size_t idx1, size_t idx2, size_t num_key_rows, size_t num_key_columns)
 {
   for (size_t i=0; i < num_key_columns; ++i) {
     if (key_columns[i+num_key_rows*idx1] != key_columns[i+num_key_rows*idx2])
@@ -359,3 +359,95 @@ struct is_pos
     return x >= 0;
   }
 };
+
+extern std::mt19937 gen;
+
+template <typename T> __host__
+unsigned int predictTableLength_CPU(const T* key_columns,
+				    size_t num_key_rows,
+				    size_t num_key_columns)
+{
+  // Predict Hash Table length based on 2 state transfer matrix
+  unsigned int numEqual = 0;
+  unsigned int numTotal = 0;
+
+  std::uniform_int_distribution<unsigned int> keyRange(0, num_key_rows-1);
+
+  // max try 1% of key_rows
+  for (size_t i=0; i < num_key_rows/100; ++i) {
+    size_t idx1 = keyRange(gen);
+    size_t idx2 = keyRange(gen);
+    bool result = keyEqualCM(key_columns, idx1, idx2, num_key_rows, num_key_columns);
+    if (result) 
+      ++numEqual;
+    ++numTotal;
+    if (numEqual == 10)
+      break;
+  }
+  if (numEqual < 2) // very few sample, return 1/4 of original
+    return num_key_rows / 4;
+  return (unsigned int) 2.6f * ((float)(numTotal) / numEqual);
+}
+
+__global__
+void fillCURANDState(curandState* state, unsigned long seed)
+{
+  size_t idx = threadIdx.x + blockDim.x * blockIdx.x;
+  curand_init(seed, idx, 0, &state[idx]);
+}
+
+template <typename T> __global__
+void predictTableLength_GPU(const T* key_columns,
+			    size_t num_key_rows,
+			    size_t num_key_columns,
+			    size_t iterations,
+			    unsigned int* count,
+			    curandState* state)
+{  
+#ifdef DEBUG
+  constexpr unsigned int BLOCKSIZE = 512;
+#else
+  constexpr unsigned int BLOCKSIZE = 1024;
+#endif
+
+  __shared__ unsigned int count_shared[3*BLOCKSIZE];
+  size_t idx = threadIdx.x + blockDim.x * blockIdx.x;
+  // initial shared memory
+  for (size_t i = 0; i < 3; ++i) {
+    count_shared[i*BLOCKSIZE + threadIdx.x] = 0;
+  }
+  for (size_t i = 0; i < iterations; ++i) {
+    unsigned int test_idx[3];
+    bool result[3];
+    for (size_t j = 0; j < 3; ++j) 
+      test_idx[j] = floorf(curand_uniform(&state[idx]) * num_key_rows);
+    // compare keys
+    for (size_t j = 0; j < 3; ++j) 
+      result[j] = keyEqualCM(key_columns, test_idx[j],
+			     test_idx[(j+1)%3], num_key_rows,
+			     num_key_columns);
+    if (result[0] && result[1]) // any two is true then 3 are equal
+      count_shared[threadIdx.x] += 1;
+    else if (result[0] || result[1] || result[2]) // any one is true then 2 are equal
+      count_shared[BLOCKSIZE + threadIdx.x] += 1;
+    else // three are different
+      count_shared[BLOCKSIZE*2 + threadIdx.x] += 1;
+  }
+  __syncthreads();
+  // reduction
+  for (size_t stride = (blockDim.x >> 1);
+       stride >= 1;
+       stride >>= 1) {
+    if (threadIdx.x < stride) {
+      for (size_t i = 0; i < 3; ++i) {
+	count_shared[threadIdx.x + BLOCKSIZE*i]
+	  += count_shared[threadIdx.x + BLOCKSIZE*i + stride];  
+      }
+    }
+    __syncthreads();
+  }
+  if (threadIdx.x == 0)
+    for (size_t i = 0; i < 3; ++i) {
+      count[i] = count_shared[BLOCKSIZE*i];
+    }
+}
