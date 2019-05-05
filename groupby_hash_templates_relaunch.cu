@@ -30,6 +30,8 @@ size_t HashKey(size_t idx, T* key_columns, size_t num_key_rows, size_t num_key_c
   size_t hash_key = 0;
   for (size_t i=0; i < num_key_columns; ++i) {
     hash_key = (31 * hash_key) + key_columns[i*num_key_rows+idx];
+    //hash_key = ((hash_key<<5)-1) + key_columns[i*num_key_rows+idx];
+    //hash_key = (29 * hash_key) + key_columns[i*num_key_rows+idx];
   }
   return hash_key;
 }
@@ -42,11 +44,10 @@ void updateEntry(Tval* value_columns,
 		 size_t hashPos,
 		 Tval* hash_results,
 		 int* countPtr,
-		 size_t len_hash_table,
-		 int count=1)
+		 size_t len_hash_table)
 {
   // update count
-  atomicAdd(countPtr, count);
+  atomicAdd(countPtr, 1);
   // update each item
   for (size_t i = 0; i < num_ops; ++i) {
     Tval value = value_columns[i * num_val_rows + idx];
@@ -59,7 +60,7 @@ void updateEntry(Tval* value_columns,
       atomicMax(&(hash_results[val_idx]), value);
       break;
     case rcount:
-      atomicAdd(&(hash_results[val_idx]), count);
+      atomicAdd(&(hash_results[val_idx]), 1);
       break;
     case rmean: // fall-thru
     case rsum:
@@ -68,6 +69,7 @@ void updateEntry(Tval* value_columns,
     }
   }
 }
+
 
 template <typename Tkey, typename Tval> __global__
 void fillTable(Tkey* key_columns,
@@ -81,10 +83,8 @@ void fillTable(Tkey* key_columns,
 	       Tval* hash_results,
 	       size_t len_hash_table,
 	       size_t num_ops,
-         int* overflow_flag
          )
 {
-
   size_t idx = threadIdx.x + blockIdx.x * blockDim.x;
   size_t offset = gridDim.x * blockDim.x;
   for (size_t i = idx; i < num_key_rows; i += offset) {
@@ -106,7 +106,10 @@ void fillTable(Tkey* key_columns,
 	if (!keyEqualCM<Tkey>(key_columns, (size_t)old, i, num_key_rows, num_key_cols)) {
 	  // collision
 	  curPos = (curPos + 1) % len_hash_table; // linear probing
-	  if (++collisionCount >= len_hash_table * 0.75)
+
+	  //if (++collisionCount >= len_hash_table * 0.8)
+    if (++collisionCount >= len_hash_table)
+
 	    break; // break the loop if it looped over the hash table and still failed
 	  continue;
 	}
@@ -116,153 +119,121 @@ void fillTable(Tkey* key_columns,
       updateEntry<Tval>(value_columns, num_val_rows, num_ops, i, curPos, hash_results, &(hash_count[curPos]), len_hash_table);
     }
     if (!isInserted) {
+
+
+
+
+
+      // Basic implementation: Just Restart the kernel with 4x memory
+
       // Do sth in the case of overflowing hash table
-      overflow_flag[0] = 1;
-      //printf("Overflow happened at %d \n", len_hash_table);
+      cudaFree(hash_key_idx);
+      cudaFree(hash_count);
+      cudaFree(hash_results);
+      
+      int size_multiplier =4;
+
+      //Realloc memory
+      cudaMalloc(&hash_key_idx, sizeof(int)*len_hash_table*size_multiplier);
+      cudaMalloc(&hash_count, sizeof(int)*len_hash_table*size_multiplier);
+      cudaMalloc(&hash_results, sizeof(int)*len_hash_table*num_ops*size_multiplier);
+
+
+      // fill hash table
+      fillTable<int, int><<<GRIDDIM, BLOCKDIM>>>(key_columns, num_key_rows, num_key_columns,
+               value_columns, num_value_rows, num_value_columns,
+               hash_key_idx, hash_count, hash_results,
+               len_hash_table*size_multiplier, num_ops);
+
     }
+
+      // Another implementation: Do the Rehash
+
+      int size_multiplier =4;
+      //Realloc memory
+      cudaMalloc(&hash_key_idx_n, sizeof(int)*len_hash_table*size_multiplier);
+      cudaMalloc(&hash_count_n, sizeof(int)*len_hash_table*size_multiplier);
+      cudaMalloc(&hash_results_n, sizeof(int)*len_hash_table*num_ops*size_multiplier);
+      reFillTable<int, int><<<GRIDDIM, BLOCKDIM>>>(key_columns, num_key_rows, num_key_columns,
+               value_columns, num_value_rows, num_value_columns,
+               hash_key_idx, hash_count, hash_results,
+               len_hash_table*size_multiplier, num_ops, remain_idx, hash_key_idx_n, hash_count_n, hash_results_n);
+
+
+
+
+      // Third implementation, Restart from CPU side
+      overflow_flag[0] = 1;
+
+
   }
 }
 
+
+
+
 template <typename Tkey, typename Tval> __global__
-void fillTable_privatization(Tkey* key_columns,
-			     size_t num_key_rows,
-			     size_t num_key_cols,
-			     Tval* value_columns,
-			     size_t num_val_rows,
-			     size_t num_val_cols,
-			     int* hash_key_idx,
-			     int* hash_count,
-			     Tval* hash_results,
-			     size_t len_hash_table,
-			     size_t len_shared_hash_table,
-			     size_t num_ops)
+void reFillTable(Tkey* key_columns,
+         size_t num_key_rows,
+         size_t num_key_cols,
+         Tval* value_columns,
+         size_t num_val_rows,
+         size_t num_val_cols,
+         int* hash_key_idx,
+         int* hash_count,
+         Tval* hash_results,
+         size_t len_hash_table,
+         size_t num_ops,
+         size_t remain_idx,
+         int* hash_key_idx_n,
+         int* hash_count_n,
+         Tval* hash_results_n
+         )
 {
   size_t idx = threadIdx.x + blockIdx.x * blockDim.x;
   size_t offset = gridDim.x * blockDim.x;
-  __shared__ unsigned int filled_hash_table_shared;
-  extern __shared__ char hash_table_shared[];
-  int* s_hash_key_idx = (int*)hash_table_shared;
-  int* s_hash_count = (int*)&(hash_table_shared[len_shared_hash_table*sizeof(int)]);
-  size_t s_offset = (2*len_shared_hash_table*sizeof(int) + sizeof(Tval) - 1) / sizeof(Tval);
-  
-  Tval* s_hash_results = (Tval*)&(hash_table_shared[s_offset*sizeof(Tval)]);
-  
-  // initialization
-  for (size_t i = threadIdx.x; i < len_shared_hash_table; i += blockDim.x) {
-    s_hash_key_idx[i] = -1;
-    s_hash_count[i] = 0;
-    for (size_t j = 0; j < num_ops; ++j) {
-      // replace following with specialized limit template in the future
-      if (ops_c[j] == rmin) {
-	s_hash_results[j * len_shared_hash_table + i] = cuda_custom::limits<Tval>::max();
-      } else if (ops_c[j] == rmax) {
-        s_hash_results[j * len_shared_hash_table + i] = cuda_custom::limits<Tval>::lowest();
-      } else {
-	s_hash_results[j * len_shared_hash_table + i] = 0;
-      }
-    }
-  }
-  if (threadIdx.x == 0) filled_hash_table_shared = 0;
-  __syncthreads();
-  
-  for (size_t i = idx; i < num_key_rows; i += offset) {
-    // try inserting, assume there is enough space
-    size_t curPos = HashKey(i, key_columns, num_key_rows, num_key_cols) % len_shared_hash_table;
-    unsigned int collisionCount = 0;
-    bool isInserted = false;
-    while (!isInserted) {
-      // quit if shared hash table is 80% full
-      if (filled_hash_table_shared >= ( 8 * len_shared_hash_table / 10)) break;
-      int old = s_hash_key_idx[curPos];
-      // if it is -1, try update, else don't
-      if (old == -1) 
-	old = atomicCAS(&(s_hash_key_idx[curPos]), -1, i);
-      // now old contains either -1 or a new address, if it is a new address meaning other thread claimed it
-      
-      if (old != -1) {
-	// note: old should not contain -1 now, safe to cast to size_t
-	if (!keyEqualCM<Tkey>(key_columns, (size_t)old, i, num_key_rows, num_key_cols)) {
-	  // collision
-	  curPos = (curPos + 1) % len_shared_hash_table; // linear probing
-	  if (++collisionCount == len_shared_hash_table)
-	    break; // break the loop if it looped over the hash table and still failed
-	  continue;
-	}
-      } else {
-	atomicAdd(&filled_hash_table_shared, 1);
-      }
-      // now it is safe to update the entry
-      isInserted = true;
-      updateEntry<Tval>(value_columns, num_val_rows, num_ops, i, curPos, s_hash_results, &(s_hash_count[curPos]), len_shared_hash_table);
-    }
-    // if current column not inserted, insert to global one
-    curPos = HashKey(i, key_columns, num_key_rows, num_key_cols) % len_hash_table;
-    collisionCount = 0;
-    while (!isInserted) {
-      // first read the value out
 
-      int old = hash_key_idx[curPos];
-      // if it is -1, try update, else don't
-      if (old == -1) 
-	old = atomicCAS(&(hash_key_idx[curPos]), -1, i);
-      // now old contains either -1 or a new address, if it is a new address meaning other thread claimed it
-      
-      if (old != -1) {
-	// note: old should not contain -1 now, safe to cast to size_t
-	if (!keyEqualCM<Tkey>(key_columns, (size_t)old, i, num_key_rows, num_key_cols)) {
-	  // collision
-	  curPos = (curPos + 1) % len_hash_table; // linear probing
-	  if (++collisionCount == len_hash_table)
-	    break; // break the loop if it looped over the hash table and still failed
-	  continue;
-	}
-      }
-      // now it is safe to update the entry
-      isInserted = true;
-      updateEntry<Tval>(value_columns, num_val_rows, num_ops, i, curPos, hash_results, &(hash_count[curPos]), len_hash_table);
-
-    }
-    if (!isInserted) {
-      // Do sth in the case of overflowing hash table
-    }
-  }
-  __syncthreads();
-  for (size_t i = threadIdx.x; i < len_shared_hash_table; i += blockDim.x) {
-    int real_idx = s_hash_key_idx[i];
-    if (real_idx != -1) {
-      size_t curPos = HashKey(real_idx, key_columns, num_key_rows, num_key_cols) % len_hash_table;
+  for (int i = threadIdx.x; i < len_hash_table/4; i += blockDim.x) {
+    int curr_idx = s_hash_key_idx[i];
+    if (curr_idx != -1) {
+      size_t curPos = HashKey(curr_idx, key_columns, num_key_rows, num_key_cols) % len_hash_table;
       int collisionCount = 0;
       bool isInserted = false;
       while (!isInserted) {
-	// first read the value out
-	int old = hash_key_idx[curPos];
-	// if it is -1, try update, else don't
-	if (old == -1) 
-	  old = atomicCAS(&(hash_key_idx[curPos]), -1, real_idx);
-	// now old contains either -1 or a new address, if it is a new address meaning other thread claimed it
-	
-	if (old != -1) {
-	  // note: old should not contain -1 now, safe to cast to size_t
-	  if (!keyEqualCM<Tkey>(key_columns, (size_t)old, real_idx, num_key_rows, num_key_cols)) {
-	    // collision
-	    curPos = (curPos + 1) % len_hash_table; // linear probing
-	    if (++collisionCount == len_hash_table)
-	      break; // break the loop if it looped over the hash table and still failed
-	    continue;
-	  }
-	}
-	// now it is safe to update the entry
-	isInserted = true;
-	updateEntry<Tval>(s_hash_results, len_shared_hash_table, num_ops,
-			  i, curPos, hash_results, &(hash_count[curPos]), len_hash_table, s_hash_count[i]);
-	
+  // first read the value out
+  int old = hash_key_idx_n[curPos];
+  // if it is -1, try update, else don't
+  if (old == -1) 
+    old = atomicCAS(&(hash_key_idx_n[curPos]), -1, curr_idx);
+  // now old contains either -1 or a new address, if it is a new address meaning other thread claimed it
+  
+  if (old != -1) {
+    // note: old should not contain -1 now, safe to cast to size_t
+    if (!keyEqualCM<Tkey>(key_columns, (size_t)old, curr_idx, num_key_rows, num_key_cols)) {
+      // collision
+      curPos = (curPos + 1) % len_hash_table; // linear probing
+      if (++collisionCount >= len_hash_table * 0.75)
+        break; // break the loop if it looped over the hash table and still failed
+      continue;
+    }
+  }
+  // now it is safe to update the entry
+  isInserted = true;
+  updateEntry<Tval>(hash_results, len_hash_table/4, num_ops,
+        i, curPos, hash_results_n, &(hash_count_n[curPos]), len_hash_table, hash_count[i]);
+  
       }
       if (!isInserted) {
-	// Do sth in the case of overflowing hash table
+  // Do sth in the case of overflowing hash table
       }
     }
   } 
 }
+
+
+
+
+
 
 template <typename Tval> __global__
 void initializeVariable(int* hash_key_idx,
@@ -329,7 +300,6 @@ void copyValues(
     )
 {
   int idx = threadIdx.x + blockIdx.x * blockDim.x;
-  //printf("%d\n",idx);
   while (idx < num_output_rows){
     for (size_t i = 0; i < num_ops; ++i) {
       size_t val_idx = i * len_hash_table + hashTable_idxs_d[idx];

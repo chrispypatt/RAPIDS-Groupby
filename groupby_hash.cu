@@ -3,11 +3,6 @@
 #include <thrust/copy.h>
 #include <thrust/execution_policy.h>
 #include <thrust/device_ptr.h>
-#include <random>
-#include <iostream>
-#include <cmath>
-#include <curand.h>
-#include <curand_kernel.h>
 
 #include "cpuGroupby.h"
 #include "groupby_hash.cuh"
@@ -41,6 +36,12 @@ void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key
   
   using Tval = int; // replace int with actual variable type if needed;
   
+  //set restarting flags;
+  int hashsize_mutiplier = 1;
+  int* overflow_flag = NULL;
+  cudaMallocManaged(&overflow_flag,sizeof(int));
+  overflow_flag[0] = 0; // No overflow happens
+
   // variableAllocating
   int* key_columns_d = NULL;
   int* value_columns_d = NULL;
@@ -50,57 +51,49 @@ void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key
 
   gpuErrchk(cudaMalloc(&key_columns_d, sizeof(int)*num_key_columns*num_key_rows));
   gpuErrchk(cudaMalloc(&value_columns_d, sizeof(int)*num_value_columns*num_value_rows));
-  
-  // copy to target
-  gpuErrchk(cudaMemcpy(key_columns_d, key_columns_h, sizeof(int)*num_key_columns*num_key_rows, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(value_columns_d, value_columns_h, sizeof(int)*num_value_columns*num_value_rows, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(ops_c, ops, sizeof(reductionType) * num_ops));
 
-  // sample hash table length
-#ifdef CPU_SAMPLE
-  unsigned int predictedLength = predictTableLength_CPU<int>(key_columns_h,
-							     num_key_rows,
-							     num_key_columns);
-  std::cout << "Predicted Hash Table Length:" << predictedLength << std::endl;
-#elif defined(GPU_SAMPLE)
-  unsigned int* count = NULL;
-  curandState* state = NULL;
-  gpuErrchk(cudaMallocManaged(&count, sizeof(unsigned int)*3));
-  gpuErrchk(cudaMalloc(&state, 1*BLOCKDIM*sizeof(curandState)));
-  unsigned int iterations = num_key_rows / BLOCKDIM / 100 + 1;
-  fillCURANDState<<<1, BLOCKDIM>>>(state, gen());
-  gpuErrchk(cudaPeekAtLastError());
-  gpuErrchk(cudaDeviceSynchronize());
-  predictTableLength_GPU<int><<<1, BLOCKDIM>>>(key_columns_d,
-					       num_key_rows,
-					       num_key_columns,
-					       iterations,
-					       count,
-					       state);
-  gpuErrchk(cudaPeekAtLastError());
-  gpuErrchk(cudaDeviceSynchronize());
-
-  unsigned int countTotal = count[0] + count[1] + count[2];
-  float delta = std::sqrt((float)countTotal*((float)countTotal*9 - (float)count[1]*12));
-  unsigned int predictedLength = 2.6 * ((3*countTotal + delta) / (2*count[1]));
-  std::cout << "Predicted Hash Table Length:" << predictedLength << std::endl;
-#endif
   
-  
-  // Allocate hash table
-  gpuErrchk(cudaMalloc(&hash_key_idx_d, sizeof(int)*HASH_TABLE_SIZE));
-  gpuErrchk(cudaMalloc(&hash_count_d, sizeof(int)*HASH_TABLE_SIZE));
-  gpuErrchk(cudaMalloc(&hash_results_d, sizeof(Tval)*HASH_TABLE_SIZE*num_ops));
 
-  initializeVariable<int><<<GRIDDIM, BLOCKDIM>>>(hash_key_idx_d, hash_count_d, hash_results_d, HASH_TABLE_SIZE, num_ops);
-  gpuErrchk(cudaDeviceSynchronize());
-
-  // fill hash table
 #ifndef PRIVATIZATION
-  fillTable<int, int><<<GRIDDIM, BLOCKDIM>>>(key_columns_d, num_key_rows, num_key_columns,
-					     value_columns_d, num_value_rows, num_value_columns,
-					     hash_key_idx_d, hash_count_d, hash_results_d,
-					     HASH_TABLE_SIZE, num_ops);
+    
+  do {
+    overflow_flag[0] = 0;
+
+    
+  
+    gpuErrchk(cudaMalloc(&hash_key_idx_d, sizeof(int)*HASH_TABLE_SIZE*hashsize_mutiplier));
+    gpuErrchk(cudaMalloc(&hash_count_d, sizeof(int)*HASH_TABLE_SIZE*hashsize_mutiplier));
+    gpuErrchk(cudaMalloc(&hash_results_d, sizeof(int)*HASH_TABLE_SIZE*num_ops*hashsize_mutiplier)); 
+  
+    gpuErrchk(cudaMemcpy(key_columns_d, key_columns_h, sizeof(int)*num_key_columns*num_key_rows, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(value_columns_d, value_columns_h, sizeof(int)*num_value_columns*num_value_rows, cudaMemcpyHostToDevice));
+    initializeVariable<int><<<GRIDDIM, BLOCKDIM>>>(hash_key_idx_d, hash_count_d, hash_results_d, HASH_TABLE_SIZE*hashsize_mutiplier, num_ops);
+    gpuErrchk(cudaDeviceSynchronize());
+
+
+    fillTable<int, int><<<GRIDDIM, BLOCKDIM>>>(key_columns_d, num_key_rows, num_key_columns,
+               value_columns_d, num_value_rows, num_value_columns,
+               hash_key_idx_d, hash_count_d, hash_results_d,
+               HASH_TABLE_SIZE*hashsize_mutiplier, num_ops, overflow_flag);
+    gpuErrchk(cudaDeviceSynchronize());
+    printf("The overflow_flag is: %d\n", overflow_flag[0]);
+    printf("Current hash size is: %d\n", hashsize_mutiplier*HASH_TABLE_SIZE);
+    if (overflow_flag[0] == 1) {
+      hashsize_mutiplier *= 3;
+      cudaFree(hash_key_idx_d);
+      cudaFree(hash_count_d);
+      cudaFree(hash_results_d);
+      hash_key_idx_d = NULL;
+      hash_count_d = NULL;
+      hash_results_d = NULL;
+    
+    }
+
+  } while(overflow_flag[0] == 1);
+  
+    //printf("The overflow_flag is: %d\n", overflow_flag[0]);
+
 #else
   cudaDeviceProp deviceProp;
   cudaGetDeviceProperties(&deviceProp, 0);
@@ -126,7 +119,7 @@ void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key
 							num_key_columns, value_columns_d,
 							num_value_rows, num_value_columns,
 							hash_key_idx_d, hash_count_d,
-							hash_results_d, HASH_TABLE_SIZE,
+							hash_results_d, HASH_TABLE_SIZE*hashsize_mutiplier,
 							s_len_table, num_ops);
 #endif
   gpuErrchk(cudaPeekAtLastError());
@@ -135,27 +128,34 @@ void groupby_hash_GPU(const int hash_size, const int* key_columns_h, int num_key
   //shrink the hash table to output array
   //Create array of idices for hash table
   int *seq, *hashTable_idxs;
-  cudaMalloc((void**)&seq, HASH_TABLE_SIZE*sizeof(int)); //for hash index sequence  
-  cudaMalloc((void**)&hashTable_idxs, HASH_TABLE_SIZE*sizeof(int));  //for key indexs without -1   
+  int hash_table_size_fixed = HASH_TABLE_SIZE*hashsize_mutiplier;
+  cudaMalloc((void**)&seq, HASH_TABLE_SIZE*hashsize_mutiplier*sizeof(int)); //for hash index sequence  
+  cudaMalloc((void**)&hashTable_idxs, HASH_TABLE_SIZE*hashsize_mutiplier*sizeof(int));  //for key indexs without -1   
   thrust::device_ptr<int> hash_d_seq = thrust::device_pointer_cast(seq); //for hash index sequence 
   thrust::device_ptr<int> hashTable_idxs_d = thrust::device_pointer_cast(hashTable_idxs); //for key indexs without -1 
-  thrust::sequence(thrust::device, hash_d_seq, hash_d_seq + HASH_TABLE_SIZE); //fill hash index seq
+  thrust::sequence(thrust::device, hash_d_seq, hash_d_seq + hash_table_size_fixed); //fill hash index seq
 
 
   //copy hash idex of keys, removeing -1's which signify not used
 //   copy_if(policy, index seq start, index seq end, hash keys for comparison, result containing idx to non -1's, comparator)
-  auto newEnd = thrust::copy_if(thrust::device, hash_d_seq, hash_d_seq + HASH_TABLE_SIZE, hash_key_idx_d, hashTable_idxs_d, is_pos());
+  auto newEnd = thrust::copy_if(thrust::device, hash_d_seq, hash_d_seq + hash_table_size_fixed, hash_key_idx_d, hashTable_idxs_d, is_pos());
   
   num_output_rows = newEnd - hashTable_idxs_d;
   printf("%d output rows!\n", num_output_rows);
+  printf("%d hash length!\n", HASH_TABLE_SIZE*hashsize_mutiplier);
 
   int* output_key_columns_d = NULL;
   cudaMalloc(&output_key_columns_d, sizeof(int)*num_key_columns*num_output_rows);
   copyUnique<int><<<GRIDDIM,BLOCKDIM>>>(hashTable_idxs, hash_key_idx_d,key_columns_d, output_key_columns_d, num_output_rows, num_key_columns, num_key_rows);
 
+  //gpuErrchk(cudaDeviceSynchronize());
+
   int* output_value_columns_d = NULL;
-  cudaMalloc(&output_value_columns_d, sizeof(int)*num_value_columns*num_output_rows);
-  copyValues<int><<<GRIDDIM,BLOCKDIM>>>(hashTable_idxs, hash_results_d,hash_count_d, value_columns_d, output_value_columns_d, num_output_rows, num_value_columns, num_value_rows, num_ops, HASH_TABLE_SIZE);
+  gpuErrchk(cudaMalloc(&output_value_columns_d, sizeof(int)*num_value_columns*num_output_rows));
+  copyValues<int><<<GRIDDIM,BLOCKDIM>>>(hashTable_idxs, hash_results_d,hash_count_d, value_columns_d, output_value_columns_d, num_output_rows, num_value_columns, num_value_rows, num_ops, hash_table_size_fixed);
+
+  printf("%d,%d\n",BLOCKDIM,GRIDDIM);
+  printf("waiting for Sync\n");
 
   gpuErrchk(cudaDeviceSynchronize());
 
