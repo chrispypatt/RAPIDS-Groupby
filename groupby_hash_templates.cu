@@ -80,8 +80,11 @@ void fillTable(Tkey* key_columns,
 	       int* hash_count,
 	       Tval* hash_results,
 	       size_t len_hash_table,
-	       size_t num_ops)
+	       size_t num_ops,
+         int* overflow_flag
+         )
 {
+
   size_t idx = threadIdx.x + blockIdx.x * blockDim.x;
   size_t offset = gridDim.x * blockDim.x;
   for (size_t i = idx; i < num_key_rows; i += offset) {
@@ -103,7 +106,7 @@ void fillTable(Tkey* key_columns,
 	if (!keyEqualCM<Tkey>(key_columns, (size_t)old, i, num_key_rows, num_key_cols)) {
 	  // collision
 	  curPos = (curPos + 1) % len_hash_table; // linear probing
-	  if (++collisionCount == len_hash_table)
+	  if (++collisionCount >= len_hash_table * 0.75)
 	    break; // break the loop if it looped over the hash table and still failed
 	  continue;
 	}
@@ -114,6 +117,8 @@ void fillTable(Tkey* key_columns,
     }
     if (!isInserted) {
       // Do sth in the case of overflowing hash table
+      overflow_flag[0] = 1;
+      //printf("Overflow happened at %d \n", len_hash_table);
     }
   }
 }
@@ -136,7 +141,6 @@ void fillTable_privatization(Tkey* key_columns,
   size_t offset = gridDim.x * blockDim.x;
   __shared__ unsigned int filled_hash_table_shared;
   extern __shared__ char hash_table_shared[];
-
   int* s_hash_key_idx = (int*)hash_table_shared;
   int* s_hash_count = (int*)&(hash_table_shared[len_shared_hash_table*sizeof(int)]);
   size_t s_offset = (2*len_shared_hash_table*sizeof(int) + sizeof(Tval) - 1) / sizeof(Tval);
@@ -325,6 +329,7 @@ void copyValues(
     )
 {
   int idx = threadIdx.x + blockIdx.x * blockDim.x;
+  //printf("%d\n",idx);
   while (idx < num_output_rows){
     for (size_t i = 0; i < num_ops; ++i) {
       size_t val_idx = i * len_hash_table + hashTable_idxs_d[idx];
