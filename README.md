@@ -2,6 +2,7 @@
 Repository for EE 5351 Applied Parallel Programming final project on sorting based Groupby and is being updated for EE 5355 Algorithmic Techniques for Scalable Many-core Computing final project on hashed based Groupby. This project is to implement RAPIDS Groupby function in CUDA.
 
 Team members EE 5351: Aaron Nightingale, Christopher Patterson, Jersin Nguetio, Menglu Liang, Tonglin Chen
+Team members EE 5355: Tonglin Chen, Tianming Cui, Christopher Patterson, Yadu Kiran
 
 The program is tested under nvcc 8.0 and GTX 1080 GPU.
 
