@@ -4,6 +4,20 @@ Repository for EE 5351 Applied Parallel Programming final project on sorting bas
 Team members EE 5351: Aaron Nightingale, Christopher Patterson, Jersin Nguetio, Menglu Liang, Tonglin Chen
 Team members EE 5355: Tonglin Chen, Tianming Cui, Christopher Patterson, Yadu Kiran
 
+Compiling Options:
+
+dbg:		Compile target using debug mode, 512 thread per block
+
+NOPRINT:  	Target will not print the result from groupby
+
+PRIV:	  	Experimental privatization without relaunches
+
+TESLA:	  	Explicitly use 32KB shared memory per block. Should only be used with PRIV
+
+CPU_SAMPLE:	Target will run CPU sampling to predict the number of unique keys
+
+GPU_SAMPLE:	Target will run GPU sampling to predict the number of unique keys
+
 Command line usage for sorting based GroupBy:
 ```
 make
@@ -12,7 +26,7 @@ make
 ./groupby <num_rows> <key_cols> <val_cols>                          # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys: 4
 ./groupby <num_rows> <key_cols> <val_cols> <distinct_keys>  # Data Entries: num_rows, key_columns: key_cols, row_columns: val_cols, unique keys : distinct_keys
 ```
-Notice: If the number of distinct keys in each column is m, n key_columns will generate m^n distinct keys.
+
 Command line usage for hashed based GroupBy:
 ```
 make groupby_hash
@@ -36,5 +50,3 @@ The program will populate random data, compute on CPU and GPU then validate the 
 
 All rights reserved.
 
-This repo is in progress.
-Aaron wuz here
