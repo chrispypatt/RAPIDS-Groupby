@@ -2,21 +2,22 @@
 Repository for EE 5351 Applied Parallel Programming final project on sorting based Groupby and is being updated for EE 5355 Algorithmic Techniques for Scalable Many-core Computing final project on hashed based Groupby. This project is to implement RAPIDS Groupby function in CUDA.
 
 Team members EE 5351: Aaron Nightingale, Christopher Patterson, Jersin Nguetio, Menglu Liang, Tonglin Chen
+
 Team members EE 5355: Tonglin Chen, Tianming Cui, Christopher Patterson, Yadu Kiran
 
 Compiling Options:
 
-dbg:		Compile target using debug mode, 512 thread per block
+ - dbg:		Compile target using debug mode, 512 thread per block
 
-NOPRINT:  	Target will not print the result from groupby
+ - NOPRINT:  	Target will not print the result from groupby
 
-PRIV:	  	Experimental privatization without relaunches
+ - PRIV:	  	Experimental privatization without relaunches
 
-TESLA:	  	Explicitly use 32KB shared memory per block. Should only be used with PRIV
+ - TESLA:	  	Explicitly use 32KB shared memory per block. Should only be used with PRIV
 
-CPU_SAMPLE:	Target will run CPU sampling to predict the number of unique keys
+ - CPU_SAMPLE:	Target will run CPU sampling to predict the number of unique keys
 
-GPU_SAMPLE:	Target will run GPU sampling to predict the number of unique keys
+ - GPU_SAMPLE:	Target will run GPU sampling to predict the number of unique keys
 
 Command line usage for sorting based GroupBy:
 ```
